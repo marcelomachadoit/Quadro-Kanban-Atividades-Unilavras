@@ -9,3 +9,6 @@ dist/
 *.db-shm
 *.log
 .env
+/UniKanban.exe
+/_internal/
+/UniKanban.zip

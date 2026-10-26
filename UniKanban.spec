@@ -1,5 +1,6 @@
-﻿# -*- mode: python ; coding: utf-8 -*-
-# Gera dist/UniKanban/UniKanban.exe   ->   .venv\Scripts\pyinstaller UniKanban.spec --noconfirm
+# -*- mode: python ; coding: utf-8 -*-
+# Usado por build_exe.py, que coloca UniKanban.exe + _internal/ na raiz do projeto:
+#   .venv\Scripts\python.exe build_exe.py
 from PyInstaller.utils.hooks import collect_data_files
 
 datas = [("assets/icon.ico", "assets"), ("assets/icon.png", "assets"), ("assets/check.svg", "assets")]

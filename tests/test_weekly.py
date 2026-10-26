@@ -85,6 +85,7 @@ def test_main_window_starts_weekly_and_shows_card(qapp, db, monkeypatch):
     from app.services.weekly import WeeklyReport
     from app.ui import main_window as MW
     from app.ui.context import AppContext
+    monkeypatch.delenv("UNIKANBAN_NO_AUTO_UPDATE", raising=False)
     monkeypatch.setattr(MW.WeeklyWorker, "start", lambda self: None)      # não abre navegador no teste
     w = MW.MainWindow(AppContext(db, _Creds()))
     w.show()

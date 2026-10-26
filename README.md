@@ -14,8 +14,8 @@ Aplicativo desktop para Windows que entra no portal do aluno Unilavras, abre a *
 
 ## 2. Usar o executável (sem instalar Python)
 
-1. Copie a pasta `dist\UniKanban\` para onde quiser (ex.: `C:\Programas\UniKanban`).
-2. Dê dois cliques em **`UniKanban.exe`**.
+1. Dê dois cliques em **`UniKanban.exe`**, na raiz do projeto, ao lado do `main.py`.
+2. O `UniKanban.exe` precisa da pasta **`_internal`** ao lado dele, porque é lá que ficam as bibliotecas. Para usar o app em outro lugar (ex.: `C:\Programas\UniKanban`), copie os **dois** juntos: `UniKanban.exe` e `_internal\`.
 3. (Opcional) Verifique se o Chrome e a automação estão funcionando:
    `UniKanban.exe --diagnostico` (código de saída 0 = tudo certo).
 
@@ -126,11 +126,22 @@ Os backups (**Configurações › Fazer backup**) são cópias consistentes do b
 
 ## 8. Gerar o executável
 
+Feche o UniKanban e rode:
+
 ```powershell
-.\.venv\Scripts\pyinstaller.exe UniKanban.spec --noconfirm
+.\.venv\Scripts\python.exe build_exe.py
 ```
 
-O resultado fica em `dist\UniKanban\UniKanban.exe` (cerca de 270 MB, distribuído como pasta). Para recriar o ícone: `.\.venv\Scripts\python.exe assets\make_icon.py`.
+O script:
+
+1. roda o PyInstaller (`UniKanban.spec`);
+2. coloca **`UniKanban.exe`** e a pasta **`_internal`** na raiz do projeto, substituindo a versão anterior;
+3. apaga os arquivos temporários (`build/`);
+4. executa o autodiagnóstico do `.exe` (abre o Chrome em segundo plano e confere a tela de login do portal).
+
+O total fica em cerca de 270 MB. Seus dados ficam em `%LOCALAPPDATA%\UniKanban` e não são afetados.
+
+**Pacote para envio:** `build_exe.py --zip` gera também o **`UniKanban.zip`** (~106 MB) na raiz. Ele contém a pasta `UniKanban/` com `UniKanban.exe`, `_internal/` e um `LEIA-ME.txt` de instruções para quem baixar. Para empacotar o executável atual sem gerá-lo de novo, use `build_exe.py --zip-only`. O zip não leva nenhum dado pessoal, porque senha, atividades e notas ficam no computador de cada um. Para recriar o ícone: `.\.venv\Scripts\python.exe assets\make_icon.py`.
 
 ## 9. Testes
 
@@ -161,7 +172,14 @@ Remove-Item Env:UNIKANBAN_TEST_USER, Env:UNIKANBAN_TEST_PASSWORD
 ## 10. Arquitetura
 
 ```
+UniKanban.exe               aplicativo pronto para usar (gerado por build_exe.py)
+_internal/                  bibliotecas do executável (não editar; precisa ficar ao lado do .exe)
+build_exe.py                gera o executável e o coloca na raiz
+UniKanban.spec              configuração do PyInstaller
 main.py                     inicialização, tema, tratamento global de erros, --diagnostico
+app/services/weekly.py      atualização semanal automática (uma sessão de login para tudo)
+app/automation/meetings_parser.py  encontros virtuais a partir do conteúdo das disciplinas
+app/models/                 atividades, notas/AVIN e disciplinas/encontros
 app/config.py               caminhos, fuso, limites (tempos, tentativas) e regras (95%, 48 h)
 app/models/activity.py      Course, ScrapedActivity, Activity (valores do portal × do usuário)
 app/database/db.py          SQLite: esquema versionado, WAL, transações, lixeira, histórico

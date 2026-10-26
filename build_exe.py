@@ -1,0 +1,118 @@
+"""Gera o executável e o coloca na raiz do projeto: UniKanban.exe + pasta _internal (bibliotecas).
+
+Uso:  .\\.venv\\Scripts\\python.exe build_exe.py            gera o executável
+      .\\.venv\\Scripts\\python.exe build_exe.py --zip      gera o executável e o UniKanban.zip para envio
+      .\\.venv\\Scripts\\python.exe build_exe.py --zip-only só cria o UniKanban.zip com o executável atual
+
+Etapas: confere se o app está fechado, roda o PyInstaller (UniKanban.spec) numa pasta temporária, substitui o
+UniKanban.exe e a pasta _internal da raiz, apaga os arquivos temporários e executa o autodiagnóstico do .exe.
+Os dados do usuário (%LOCALAPPDATA%\\UniKanban) não são tocados.
+"""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+EXE = ROOT / "UniKanban.exe"
+INTERNAL = ROOT / "_internal"
+WORK = ROOT / "build"
+STAGE = WORK / "_dist"
+ZIP = ROOT / "UniKanban.zip"
+
+LEIA_ME = """UniKanban - Tarefas Unilavras
+==============================
+
+Organiza as atividades, prazos, notas e encontros virtuais da Sala de Aula Virtual Unilavras em um quadro
+Kanban. Funciona no seu computador: seus dados e sua senha ficam somente nele.
+
+COMO USAR
+1. Extraia este arquivo .zip (clique com o botão direito > "Extrair tudo...").
+   Não abra o programa de dentro do .zip.
+2. Abra a pasta "UniKanban" e dê dois cliques em UniKanban.exe.
+3. Na tela inicial, informe seu usuário e senha do portal do aluno e clique em
+   "Conectar e buscar atividades".
+
+REQUISITOS
+- Windows 10 ou 11.
+- Google Chrome instalado (o aplicativo usa o Chrome em segundo plano para ler o portal).
+
+AVISOS
+- Na primeira abertura, o Windows pode mostrar "O Windows protegeu o computador", porque o programa não tem
+  assinatura digital. Clique em "Mais informações" e depois em "Executar assim mesmo".
+- Mantenha o UniKanban.exe sempre junto da pasta "_internal" (ela contém as bibliotecas do programa).
+- Sua senha fica guardada no Gerenciador de Credenciais do Windows, nunca em arquivos. O aplicativo apenas lê o
+  portal: nada é enviado ou alterado lá.
+- Toda semana, na primeira vez que você abrir o app a partir de segunda-feira, ele atualiza tudo sozinho.
+"""
+
+
+def app_running() -> bool:
+    out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq UniKanban.exe", "/NH"], capture_output=True, text=True)
+    return "UniKanban.exe" in out.stdout
+
+
+def make_zip() -> Path:
+    """UniKanban.zip com a pasta UniKanban/ (UniKanban.exe + _internal + LEIA-ME.txt), pronto para envio."""
+    if not (EXE.exists() and INTERNAL.exists()):
+        raise SystemExit("Executável não encontrado. Rode primeiro: build_exe.py")
+    tmp = ZIP.with_suffix(".zip.tmp")
+    with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        z.write(EXE, "UniKanban/UniKanban.exe")
+        for f in sorted(INTERNAL.rglob("*")):
+            if f.is_file():
+                z.write(f, "UniKanban/_internal/" + f.relative_to(INTERNAL).as_posix())
+        z.writestr("UniKanban/LEIA-ME.txt", LEIA_ME.replace("\n", "\r\n"))
+    with zipfile.ZipFile(tmp) as z:                      # confere a integridade antes de substituir
+        bad = z.testzip()
+        if bad:
+            raise SystemExit(f"Zip corrompido ({bad}).")
+    tmp.replace(ZIP)
+    print(f"Pacote para envio: {ZIP}  ({ZIP.stat().st_size / 1_048_576:.0f} MB)")
+    return ZIP
+
+
+def main() -> int:
+    if "--zip-only" in sys.argv:
+        make_zip()
+        return 0
+    if app_running():
+        print("Feche o UniKanban antes de gerar o executável (o arquivo atual está em uso).")
+        return 1
+    print("Gerando o executável…")
+    r = subprocess.run([sys.executable, "-m", "PyInstaller", str(ROOT / "UniKanban.spec"), "--noconfirm",
+                        "--distpath", str(STAGE), "--workpath", str(WORK / "_work")], cwd=ROOT)
+    built = STAGE / "UniKanban"
+    if r.returncode != 0 or not (built / "UniKanban.exe").exists():
+        print("Falha ao gerar o executável.")
+        return 1
+
+    # substitui a versão anterior na raiz
+    if EXE.exists():
+        EXE.unlink()
+    if INTERNAL.exists():
+        shutil.rmtree(INTERNAL)
+    shutil.move(str(built / "UniKanban.exe"), EXE)
+    shutil.move(str(built / "_internal"), INTERNAL)
+    shutil.rmtree(WORK, ignore_errors=True)
+    old_dist = ROOT / "dist"                      # local antigo do executável
+    if old_dist.exists():
+        shutil.rmtree(old_dist, ignore_errors=True)
+
+    print("Conferindo o executável (Chrome + portal)…")
+    d = subprocess.run([str(EXE), "--diagnostico"])
+    if d.returncode != 0:
+        print(f"O executável foi gerado, mas o autodiagnóstico falhou (código {d.returncode}).")
+        return d.returncode
+    size = sum(f.stat().st_size for f in INTERNAL.rglob("*") if f.is_file()) + EXE.stat().st_size
+    print(f"Pronto: {EXE}  (+ pasta _internal, {size / 1_048_576:.0f} MB no total)")
+    if "--zip" in sys.argv:
+        make_zip()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
