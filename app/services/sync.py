@@ -25,6 +25,7 @@ class SyncReport:
     unchanged: int = 0
     not_found: int = 0
     restored: int = 0                                     # excluídas pelo usuário e reinseridas por estarem no portal
+    auto_completed: list = field(default_factory=list)    # movidas para Concluído por já terem sido entregues
     added_names: list = field(default_factory=list)
     due_changes: list = field(default_factory=list)       # (atividade, prazo antigo, prazo novo)
     conflicts: list = field(default_factory=list)         # (atividade, campo)
@@ -44,6 +45,8 @@ class SyncReport:
             f"Atividades encontradas: {self.found}",
             f"Adicionadas: {self.added}   Atualizadas: {self.updated}   Sem alterações: {self.unchanged}",
         ]
+        if self.auto_completed:
+            lines.append(f"Movidas para Concluído (já entregues no portal): {len(self.auto_completed)}")
         if self.restored:
             lines.append(f"Reinseridas no quadro (tinham sido excluídas e continuam no portal): {self.restored}")
         if self.not_found:
@@ -204,6 +207,45 @@ class SyncService:
 
 
 # ---------------------------------------------------------------------- edição manual
+
+def apply_submissions(db: Database, course_name: str, grades: dict, now: Optional[datetime] = None) -> list[str]:
+    """Marca como concluídas as atividades que a Grade de Notas do portal indica como entregues.
+
+    * Entregue = ``isCompleted`` verdadeiro ou data de envio (``submittedAt``) presente.
+    * A atividade vai para "Concluído" só na PRIMEIRA vez em que a entrega é detectada; se o usuário a mover de
+      volta depois, a próxima atualização não força de novo (o controle manual é preservado).
+    Retorna os nomes das atividades movidas.
+    """
+    from app.automation.grades_parser import _iso
+    from app.models.activity import STATUS_DONE
+    course_n = normalize(course_name)
+    submitted: dict[str, Optional[str]] = {}
+    for cat in (grades or {}).get("gradeCategories") or []:
+        for g in cat.get("gradeBooks") or []:
+            if g.get("isCompleted") or g.get("submittedAt"):
+                submitted[normalize(g.get("name"))] = _iso(g.get("submittedAt"))
+    if not submitted:
+        return []
+    moved = []
+    for a in db.list_activities():
+        if a.origin != "portal" or normalize(a.portal_course) != course_n:
+            continue
+        key = normalize(a.portal_name)
+        if key not in submitted:
+            continue
+        fields: dict = {"portal_submitted_at": submitted[key]}
+        if not a.portal_completed:
+            fields["portal_completed"] = True
+            if a.status != STATUS_DONE:
+                fields["status"] = STATUS_DONE
+                fields["position"] = db.next_position(STATUS_DONE)
+                moved.append(a.name)
+        if fields != {"portal_submitted_at": a.portal_submitted_at}:
+            db.update_fields(a.id, **fields)
+    if moved:
+        log.info("Atividades já entregues movidas para Concluído (%s): %s", course_name, len(moved))
+    return moved
+
 
 def apply_user_edit(db: Database, activity_id: int, name: str, course: str, due_at: Optional[datetime],
                     points: str, status: str, notes: str) -> None:

@@ -134,3 +134,15 @@ def test_parser_skips_section_with_graded_child():
     scan = P.parse_contents_json(data, "Banco de Dados", 1, "https://x", now=NOW)
     assert "Ciclo I" not in [a.name for a in scan.activities]
     assert scan.skipped_expired == 1
+
+
+
+def test_activity_update_moves_already_submitted_to_done(db):
+    r, _ = run(db)
+    assert r.auto_completed == ["Trabalho prático"]
+    by = {a.name: a for a in db.list_activities()}
+    assert by["Trabalho prático"].status == "done" and by["Trabalho prático"].portal_completed
+    assert by["Questionário do Módulo 3"].status == "todo"
+    assert "já entregues no portal" in r.summary_text()
+    r2, _ = run(db)                                                    # segunda vez: nada a mover
+    assert r2.auto_completed == []

@@ -150,3 +150,68 @@ def test_deleted_manual_activity_stays_deleted(db):
     db.soft_delete(mid)
     SyncService(db).apply([act()], ["Banco de Dados"])
     assert db.get(mid).deleted_at is not None
+
+
+# ------------------------------------------------------------------ atividades já entregues no portal
+
+def _grades(*books):
+    return {"name": "Banco de Dados", "gradeCategories": [{"name": "Atividades avaliativas", "gradeBooks": [
+        {"name": n, "value": None, "isCompleted": done, "submittedAt": sub} for n, done, sub in books]}]}
+
+
+def test_submitted_activity_moves_to_done_even_before_deadline(db):
+    from app.services.sync import apply_submissions
+    SyncService(db).apply([act(name="Atividade teórica - Ciclo 2"), act(name="Desafio - Ciclo 2")], ["Banco de Dados"])
+    moved = apply_submissions(db, "Banco de Dados", _grades(("Atividade teórica - Ciclo 2", True, "2026-10-20 10:00:00"),
+                                                            ("Desafio - Ciclo 2", False, None)))
+    assert moved == ["Atividade teórica - Ciclo 2"]
+    by = {a.name: a for a in db.list_activities()}
+    done = by["Atividade teórica - Ciclo 2"]
+    assert done.status == STATUS_DONE and done.portal_completed
+    assert done.portal_submitted_at.startswith("2026-10-20T10:00")
+    assert done.due_at > datetime(2026, 10, 26, tzinfo=TZ)            # prazo ainda não chegou
+    assert by["Desafio - Ciclo 2"].status == "todo"
+
+
+def test_submission_respects_manual_move_back(db):
+    from app.services.sync import apply_submissions
+    SyncService(db).apply([act(name="Atividade teórica - Ciclo 2")], ["Banco de Dados"])
+    g = _grades(("Atividade teórica - Ciclo 2", True, None))
+    apply_submissions(db, "Banco de Dados", g)
+    a = db.list_activities()[0]
+    db.update_fields(a.id, status="todo")                             # usuário devolveu para A fazer
+    assert apply_submissions(db, "Banco de Dados", g) == []           # não força de novo
+    assert db.get(a.id).status == "todo"
+
+
+def test_submission_matches_only_same_course_and_survives_restart(db_path):
+    from app.services.sync import apply_submissions
+    d = Database(db_path)
+    SyncService(d).apply([act(name="Lista 1"), act(name="Lista 1", course="Redes")], ["Banco de Dados", "Redes"])
+    apply_submissions(d, "Banco de Dados", _grades(("Lista 1", True, None)))
+    d.close()
+    d2 = Database(db_path)
+    st = {a.course: (a.status, a.portal_completed) for a in d2.list_activities()}
+    assert st == {"Banco de Dados": ("done", True), "Redes": ("todo", False)}
+    d2.close()
+
+
+def test_old_database_is_migrated(tmp_path):
+    import sqlite3
+    p = tmp_path / "antigo.db"
+    c = sqlite3.connect(p)
+    c.executescript("CREATE TABLE activities (id INTEGER PRIMARY KEY AUTOINCREMENT, source_key TEXT NOT NULL UNIQUE,"
+                    " source_id TEXT, origin TEXT NOT NULL DEFAULT 'portal', portal_name TEXT, portal_course TEXT,"
+                    " portal_due_at TEXT, portal_due_raw TEXT, portal_points TEXT, url TEXT, user_name TEXT,"
+                    " user_course TEXT, user_due_at TEXT, user_points TEXT, status TEXT NOT NULL DEFAULT 'todo',"
+                    " notes TEXT NOT NULL DEFAULT '', position REAL NOT NULL DEFAULT 0, first_seen TEXT,"
+                    " last_checked TEXT, last_seen_status TEXT NOT NULL DEFAULT 'encontrada', deleted_at TEXT,"
+                    " conflicts TEXT NOT NULL DEFAULT '[]', due_ambiguous INTEGER NOT NULL DEFAULT 0, portal_hash TEXT,"
+                    " updated_at TEXT);"
+                    "INSERT INTO activities(source_key, portal_name, notes) VALUES('k', 'Antiga', 'minha nota');"
+                    "PRAGMA user_version=1;")
+    c.close()
+    d = Database(p)
+    a = d.list_activities()[0]
+    assert (a.name, a.notes, a.portal_completed) == ("Antiga", "minha nota", False)   # dados preservados
+    d.close()

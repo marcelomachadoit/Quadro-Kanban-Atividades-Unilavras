@@ -255,6 +255,9 @@ class ActivityPanel(QFrame):
 
     def _info_rows(self, a: Activity) -> None:
         rows = [("Origem", "Sala de Aula Virtual" if a.origin == "portal" else "Criada por você")]
+        if a.portal_completed:
+            sub = iso_to_dt(a.portal_submitted_at)
+            rows.append(("Entregue no portal", sub.strftime("%d/%m/%Y às %H:%M") if sub else "sim"))
         if a.origin == "portal":
             rows.append(("Verificada", relative_time(iso_to_dt(a.last_checked))))
         rows.append(("Adicionada", relative_time(iso_to_dt(a.first_seen))))

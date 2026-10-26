@@ -133,6 +133,9 @@ class ReportDialog(QDialog):
             out.append(f"<b>Erro:</b> {e}".replace("\n", "<br>"))
         if r.added_names:
             out.append("<b>Novas:</b> " + ", ".join(r.added_names[:8]) + ("…" if len(r.added_names) > 8 else ""))
+        if getattr(r, "auto_completed", None):
+            out.append("<b>Movidas para Concluído (já entregues no portal):</b> " + ", ".join(r.auto_completed[:8])
+                       + ("…" if len(r.auto_completed) > 8 else ""))
         if r.restored:
             out.append(f"<b>Voltaram ao quadro:</b> {r.restored} (tinham sido excluídas e continuam no portal)")
         for d, old, new in r.due_changes:

@@ -105,6 +105,8 @@ class Activity:
     conflicts: list = field(default_factory=list)
     due_ambiguous: bool = False
     updated_at: Optional[str] = None
+    portal_completed: bool = False        # entregue/concluída segundo a Grade de Notas do portal
+    portal_submitted_at: Optional[str] = None
 
     # ---- valores efetivos (personalizado > portal > "-") ----
     def _eff(self, f: str):

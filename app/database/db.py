@@ -15,7 +15,7 @@ from app.models.activity import Activity, SEEN_MANUAL, STATUS_TODO, STATUSES, dt
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS activities (
@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS activities (
     deleted_at       TEXT,
     conflicts        TEXT NOT NULL DEFAULT '[]',
     due_ambiguous    INTEGER NOT NULL DEFAULT 0,
+    portal_completed INTEGER NOT NULL DEFAULT 0,   -- entregue/concluída segundo a Grade de Notas
+    portal_submitted_at TEXT,
     portal_hash      TEXT,
     updated_at       TEXT
 );
@@ -83,7 +85,7 @@ COLUMNS = [
     "id", "source_key", "source_id", "origin", "portal_name", "portal_course", "portal_due_at",
     "portal_due_raw", "portal_points", "url", "user_name", "user_course", "user_due_at", "user_points",
     "status", "notes", "position", "first_seen", "last_checked", "last_seen_status", "deleted_at",
-    "conflicts", "due_ambiguous", "updated_at",
+    "conflicts", "due_ambiguous", "updated_at", "portal_completed", "portal_submitted_at",
 ]
 
 
@@ -116,8 +118,13 @@ class Database:
         with self._lock:
             ver = self.conn.execute("PRAGMA user_version").fetchone()[0]
             self.conn.executescript(SCHEMA)
+            # migração aditiva (também cobre backups antigos restaurados): só acrescenta colunas novas
+            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(activities)")}
+            for name, ddl in (("portal_completed", "INTEGER NOT NULL DEFAULT 0"), ("portal_submitted_at", "TEXT")):
+                if name not in cols:
+                    self.conn.execute(f"ALTER TABLE activities ADD COLUMN {name} {ddl}")
+                    log.info("Banco atualizado: coluna %s adicionada", name)
             if ver < SCHEMA_VERSION:
-                # espaço para migrações futuras: if ver < 2: ALTER TABLE ...
                 self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             ok = self.conn.execute("PRAGMA quick_check").fetchone()[0]
             if ok != "ok":
@@ -163,6 +170,7 @@ class Database:
         d = {k: r[k] for k in COLUMNS}
         d["conflicts"] = json.loads(d["conflicts"] or "[]")
         d["due_ambiguous"] = bool(d["due_ambiguous"])
+        d["portal_completed"] = bool(d["portal_completed"])
         return Activity(**d)
 
     # ------------------------------------------------------------ consultas
@@ -202,6 +210,7 @@ class Database:
         vals = [getattr(a, c) for c in cols]
         vals[cols.index("conflicts")] = a.conflicts_json()
         vals[cols.index("due_ambiguous")] = int(a.due_ambiguous)
+        vals[cols.index("portal_completed")] = int(a.portal_completed)
         sql = f"INSERT INTO activities({','.join(cols)}, portal_hash) VALUES({','.join('?' * len(cols))}, ?)"
         if conn is not None:
             cur = conn.execute(sql, vals + [portal_hash])
@@ -218,6 +227,8 @@ class Database:
             fields["conflicts"] = json.dumps(fields["conflicts"], ensure_ascii=False)
         if "due_ambiguous" in fields:
             fields["due_ambiguous"] = int(bool(fields["due_ambiguous"]))
+        if "portal_completed" in fields:
+            fields["portal_completed"] = int(bool(fields["portal_completed"]))
         if "status" in fields and fields["status"] not in STATUSES:
             raise ValueError("status inválido")
         allowed = set(COLUMNS) | {"portal_hash"}

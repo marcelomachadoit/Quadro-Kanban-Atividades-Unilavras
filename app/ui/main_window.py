@@ -427,6 +427,9 @@ class MainWindow(QMainWindow):
             parts.append(plural(new, "nova", "novas"))
         if report.updated:
             parts.append(plural(report.updated, "alterada", "alteradas"))
+        if report.auto_completed:
+            parts.append(plural(len(report.auto_completed), "já entregue movida para Concluído",
+                                "já entregues movidas para Concluído"))
         msg = "Tudo atualizado · " + (", ".join(parts) if parts else "nenhuma novidade")
         if report.conflicts or report.courses_failed or report.review:
             self._show_banner("warn", "Atualizado, mas alguns itens precisam da sua atenção",

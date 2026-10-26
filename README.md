@@ -110,6 +110,7 @@ Os indicadores de prazo combinam cor, ícone e texto, para não depender só da 
 - **Seu trabalho é preservado:** status, observações, posição e edições manuais nunca são sobrescritos. Os valores do portal e os seus ficam em colunas separadas. Se o portal mudar um campo que você editou, sua edição é mantida e o cartão mostra **⚠ Divergência**; em *Detalhes* você escolhe "Usar valor do portal" ou "Manter o meu valor".
 - **Atividades que somem do portal** não são apagadas: ficam marcadas como *Não encontrada na última verificação*. Só são marcadas assim se a disciplina foi lida com sucesso.
 - **Prazo alterado no portal:** a data é atualizada e a mudança aparece no resumo.
+- **Atividades já entregues:** a cada atualização, o app lê também a **Grade de Notas** de cada disciplina. Atividades que o portal mostra como entregues (concluídas ou com data de envio) vão automaticamente para **Concluído**, mesmo que o prazo ainda não tenha chegado, e o painel mostra "Entregue no portal em …". Isso acontece só na primeira vez que a entrega é detectada: se você mover a atividade de volta, a próxima atualização respeita a sua escolha.
 - **Exclusão local:** pede confirmação e tira a atividade do quadro (ela fica em *Excluídas*, de onde pode ser restaurada). Na próxima atualização, as atividades que ainda existirem no portal **voltam ao quadro**, sem duplicar e com status e observações preservados. Atividades criadas manualmente continuam excluídas.
 
 ## 7. Onde ficam os dados

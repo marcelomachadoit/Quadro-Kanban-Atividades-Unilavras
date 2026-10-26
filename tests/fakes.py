@@ -84,6 +84,14 @@ class FakeClient:
             self.cancel.set()
         return CONTENTS[course.source_id]
 
+    def course_grades(self, course):
+        """Grade de Notas simulada: em Banco de Dados, o "Trabalho prático" já foi entregue."""
+        if course.source_id != "1":
+            return {"name": CONTENTS.get(course.source_id, {}).get("context", {}).get("academicMainName", course.name),
+                    "gradeCategories": []}
+        return {"name": "Banco de Dados", "gradeCategories": [{"name": "Atividades", "gradeBooks": [
+            {"name": "Trabalho prático", "value": None, "isCompleted": True, "submittedAt": "2026-10-25 18:00:00"}]}]}
+
     def save_diagnostic(self, *a):
         return None
 

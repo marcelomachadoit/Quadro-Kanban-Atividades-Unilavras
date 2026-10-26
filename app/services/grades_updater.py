@@ -15,6 +15,7 @@ from app.database.db import Database
 from app.models.activity import dt_to_iso
 from app.models.grades import fmt_num
 from app.services.credentials import Credentials
+from app.services.sync import apply_submissions
 from app.services.updater import Progress, load_courses, save_course_meetings, save_courses_info
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ META_LAST_GRADES = "last_grades_update"
 @dataclass
 class GradesReport:
     courses_ok: list = field(default_factory=list)
+    auto_completed: list = field(default_factory=list)   # atividades movidas para Concluído (já entregues)
     courses_failed: list = field(default_factory=list)   # (disciplina, motivo)
     avins: list = field(default_factory=list)            # (nome, nota)
     avin_error: Optional[str] = None
@@ -116,6 +118,7 @@ class GradesUpdater:
                 save_course_meetings(self.db, co, contents)
                 data = c.course_grades(co)
                 cg = G.parse_course_grades(data, co, contents, base_url=c.lxp_base)
+                report.auto_completed += apply_submissions(self.db, data.get("name") or co.name, data)
                 self.db.save_grade_snapshot(cg.key, "course", cg.to_dict(), cg.start_date)
                 report.courses_ok.append(cg.name)
                 log.info("Notas lidas: %s (nota %s)", cg.name, fmt_num(cg.final))

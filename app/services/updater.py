@@ -17,7 +17,7 @@ from app.database.db import Database
 from app.models.activity import Course, dt_to_iso
 from app.services import rules as R
 from app.services.credentials import Credentials
-from app.services.sync import SyncReport, SyncService
+from app.services.sync import SyncReport, SyncService, apply_submissions
 
 log = logging.getLogger(__name__)
 
@@ -158,6 +158,17 @@ class Updater:
             self._process_course(c, co, sync, report)
             self._emit(courses_done=i, activities_found=report.found)
 
+    def _mark_submitted(self, c: PortalClient, co: Course, course_name: str, report: SyncReport) -> None:
+        """Lê a Grade de Notas da disciplina para saber o que já foi entregue. Falha aqui não invalida a coleta."""
+        try:
+            grades = c.course_grades(co)
+        except (Cancelled, LoginFailed, SessionExpired):
+            raise
+        except Exception as e:  # noqa: BLE001
+            log.warning("Não foi possível ler as entregas de %s: %s", co.name, str(e).splitlines()[0] if str(e) else e)
+            return
+        report.auto_completed += apply_submissions(self.db, grades.get("name") or course_name, grades)
+
     def _load_courses(self, c: PortalClient, report: SyncReport) -> list[Course]:
         return load_courses(c)
 
@@ -172,8 +183,10 @@ class Updater:
                 scan = P.parse_contents_json(data, co.name, co.source_id, c.lxp_base, co.start_date)
                 acts = P.dedupe(scan.activities)
                 # grava imediatamente: uma interrupção posterior não perde o que já foi coletado
-                sync.apply(acts, [scan.activities[0].course if scan.activities else
-                                  (data.get("context") or {}).get("academicMainName") or co.name], report=report)
+                course_name = (scan.activities[0].course if scan.activities else
+                               (data.get("context") or {}).get("academicMainName") or co.name)
+                sync.apply(acts, [course_name], report=report)
+                self._mark_submitted(c, co, course_name, report)
                 report.courses_processed.append(co.name)
                 log.info("Disciplina processada: %s (%s atividades vigentes)", co.name, len(acts))
                 return
