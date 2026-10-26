@@ -71,11 +71,31 @@ O portal guarda a sessão em `sessionStorage`, que é apagado quando o navegador
 | **Painel da atividade** | Abre ao lado do quadro: edite nome, status, disciplina, prazo, pontuação e observações, resolva divergências com o portal ("Manter o meu" / "Usar do portal"), abra no portal ou exclua. Avisa antes de descartar alterações não salvas |
 | **Filtros** | Busca por nome ou disciplina, chips coloridos por disciplina, **Só urgentes**, **Ocultar concluídas**, ordenação (prazo, ordem manual, nome), alternância **quadro/lista** e **Excluídas** (para restaurar) |
 | **Atualizar agora** | Fica sempre visível na barra lateral. Roda em segundo plano, com uma barra discreta "Carregando dados do portal…" (etapa, disciplina, progresso e **Interromper**). Ao terminar, uma notificação resume o que mudou e leva ao resumo completo. Erros aparecem em uma faixa com a ação certa (ex.: **Abrir portal no navegador**, **Revisar conta**) |
+| **Calendário** | No topo, um quadro por **matéria em andamento** com os **encontros virtuais** (ex.: "Toda terça-feira às 21:00 · Próximo: Amanhã às 21:00"); matérias concluídas (mesma regra de módulos da aba Notas) não aparecem. Abaixo, o **calendário mensal** (domingo a sábado) com cada atividade no dia do prazo (barra na cor da matéria, horário, riscada se concluída; clique para abrir o painel) e os encontros virtuais (fundo lilás), em ordem de horário. Navegue com ‹ › e **Hoje**. Quando um dia tem mais de 3 itens, clique em **+N mais** (ou no número do dia) para ver **todos** os itens daquele dia, em ordem de horário; clique em uma atividade para abri-la |
+| **Notas** | Todas as matérias (inclusive as concluídas), em **ordem cronológica pela data de início**, com o AVIN do módulo somado à nota de cada uma. Cada matéria aparece como um cartão com a caixa **Matéria concluída** (e a nota total) ou **Em andamento** (e a nota atual). Clique no cartão para expandir as notas de cada atividade, separadas por categoria: data de envio, situação (*Corrigida*, *Aguardando correção*, *Não entregue*, *Pendente*) e nota obtida / quanto vale. O botão **Atualizar notas** roda **somente** a leitura de notas, sem mexer no quadro |
 | **Configurações** | Conta do portal (status da conexão, salvar, testar, abrir portal), opção de mostrar o Chrome, exportar para Excel/CSV, backup/restauração e, recolhido em **Avançado**, os nomes das opções do portal e as pastas de dados e logs |
 
 Ações rápidas, como concluir, mover ou excluir, mostram uma notificação com **Desfazer**.
 
-**Atalhos:** `F5` atualizar · `Ctrl+N` nova atividade · `Ctrl+F` buscar · `Esc` fechar o painel · `Ctrl+1/2/3` Início, Quadro, Configurações.
+**Atalhos:** `F5` atualizar (na aba Notas, atualiza as notas) · `Ctrl+N` nova atividade · `Ctrl+F` buscar · `Esc` fechar o painel · `Ctrl+1…5` Início, Quadro, Calendário, Notas, Configurações.
+
+### Atualização semanal automática
+
+Toda semana o aplicativo atualiza **tudo sozinho** (atividades, notas, AVIN e encontros virtuais) na **primeira vez que for aberto a partir de segunda-feira**. Se você não abrir o app na segunda, a atualização acontece no primeiro dia em que abrir naquela semana (ex.: na quarta). Depois disso, só na semana seguinte. Enquanto ela roda, aparece o cartão **"Atualização de dados semanal em andamento"** no canto da tela (com a etapa atual e o botão para interromper), e você pode continuar usando o app.
+
+- Tudo é feito em **uma única sessão de login**, para não acumular tentativas no portal.
+- Se a atualização falhar (sem internet, verificação de segurança), ela é tentada de novo em **outro dia** daquela semana, nunca várias vezes no mesmo dia.
+- Só roda se houver uma conta salva em Configurações.
+
+### De onde vêm os encontros virtuais
+
+Eles são lidos do conteúdo de cada disciplina na Sala de Aula Virtual, durante a atualização de atividades e a de notas: a seção semanal (ex.: "Encontro Virtual – Segunda-feira às 20h30min") vira um encontro que se repete toda semana a partir do início da matéria, e itens com data (ex.: "Encontro Virtual – 19/10") viram encontros avulsos. Quando há horários diferentes para o mesmo dia, vale o título da seção. Se a matéria não informar encontros, o quadro dela avisa.
+
+### Como as notas são calculadas
+
+- **Matérias:** a nota vem da **Grade de Notas** de cada disciplina na Sala de Aula Virtual (a mesma "NOTA FINAL" mostrada no portal, que é a soma das categorias). Cada **módulo** é definido pela data de início das matérias (mesma data = mesmo módulo). Quando um módulo novo já começou, **todas as matérias dos módulos anteriores aparecem como concluídas**, qualquer que seja o percentual. No módulo atual, uma matéria só aparece como *concluída* quando o progresso chega a 100% ou o período dela termina. Módulos que ainda não começaram ("em breve") não contam. O valor de cada atividade ("de 37", "/ 20") vem do conteúdo da disciplina e aparece quando o portal informa.
+- **AVIN:** o aplicativo abre **Portal Unilavras › AVIN › Resultados**, liga *Resultados disponíveis*, desliga *Resultados de avaliações em andamento* e abre **Visualizar Resultados** de cada AVIN. Cada questão marcada em **verde** (correta) vale **1,25**: nota = acertos × 1,25 (ex.: 17 acertos = 21,25 de 25). Questões anuladas, em branco ou com marcação dupla não somam. Só entram as avaliações com "AVIN" no nome; as provas (ex.: P1) já aparecem na Grade de Notas da matéria.
+- **O AVIN é uma nota dentro de cada matéria do seu módulo** e é **sempre somado à nota final**. O módulo do AVIN é definido pela data: é o módulo mais recente que já tinha começado no dia da prova (ex.: o AVIN de 30/09 pertence às matérias iniciadas em 11/06). No cartão da matéria, a nota aparece como "nota total · com AVIN" e, ao expandir, a seção **AVIN DO MÓDULO** mostra as questões e a conta (ex.: 70,8 + 21,25 = 92,05). Se o próprio portal lançar o AVIN na Grade de Notas da matéria, ele não é somado de novo.
 
 Os indicadores de prazo combinam cor, ícone e texto, para não depender só da cor: *Prazo encerrado*, *Vence em breve* (até 48 h, com as horas restantes), *Esta semana*, *No prazo*, *Sem prazo* e *Concluída*. Os cartões também sinalizam ⚠ *divergência com o portal* e ? *não encontrada na última verificação*.
 
@@ -130,6 +150,9 @@ Remove-Item Env:UNIKANBAN_TEST_USER, Env:UNIKANBAN_TEST_PASSWORD
 | `tests/test_sync_db.py` | 8 duplicatas · 9 atualização incremental · 10 preservação de status e observações · 11 persistência após reinício · 12 divergências · 13 exportação CSV/Excel e backup |
 | `tests/test_updater.py` | Fluxo completo com cliente simulado · 14 falhas de conexão, novas tentativas, sessão expirada, cancelamento, mudança de estrutura e login recusado |
 | `tests/test_security_ui.py` | Cofre de credenciais, senha fora do banco, filtro de logs, Kanban (soltar cartão, busca, chips de disciplina, concluir com Desfazer), painel lateral (editar e criar), tela inicial e primeiro uso |
+| `tests/test_grades.py` | Grade de Notas (nota obtida × valor, situação, concluída/em andamento), tabela e respostas do AVIN (acertos × 1,25), ordem cronológica e persistência, atualização só de notas com falhas parciais, e a aba Notas (cartões, menu expansível) |
+| `tests/test_calendar.py` | Encontros virtuais a partir dos títulos reais do portal, recorrência semanal e datas avulsas, próximo encontro, matérias concluídas ocultas, persistência, cores distintas por matéria e a aba Calendário |
+| `tests/test_weekly.py` | Regra semanal (segunda-feira, segunda pulada → quarta, uma vez por semana, nova tentativa só em outro dia), atualização semanal com um único login, cartão de notificação, e "+N mais" do calendário abrindo todos os itens do dia |
 | `tests/test_ui_format.py` | Prazos em linguagem natural, níveis de urgência com texto, nomes curtos de disciplina, pontos, agrupamento e tempo relativo |
 | `tests/test_login_detection.py` | Resultado do login com páginas simuladas: senha errada × verificação de segurança × verificação pendente |
 | `tests/test_integration_portal.py` | Portal real: atualização completa, segunda execução sem duplicatas e teste de conexão. O teste de senha errada só roda com `UNIKANBAN_TEST_WRONG_PASSWORD=1`, porque tentativas falhas levam o portal a exigir verificação humana |
@@ -148,6 +171,8 @@ app/services/credentials.py Gerenciador de Credenciais do Windows (keyring)
 app/services/logging_setup.py logs rotativos com remoção de segredos
 app/automation/portal.py    Playwright + Chrome: login, pausa manual, navegação, novas tentativas
 app/automation/parser.py    interpretação dos dados da Plataforma A (testável sem navegador)
+app/automation/grades_parser.py  Grade de Notas e respostas do AVIN (HTML), sem navegador
+app/services/grades_updater.py   atualização somente das notas (todas as matérias + AVIN)
 app/export/exporter.py      CSV, Excel, backup e restauração
 app/ui/                     PySide6: início, quadro (Kanban/lista), painel lateral, notificações, tema e
                             ícones nativos, configurações, workers; format.py = textos em linguagem natural

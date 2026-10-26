@@ -28,10 +28,28 @@ def short_course(name: Optional[str]) -> str:
     return _CODE_RE.sub("", name).strip() or name
 
 
+_ASSIGNED: dict[str, str] = {}
+
+
+def register_courses(names: list[str]) -> None:
+    """Dá a cada disciplina uma cor diferente, na ordem recebida (chamada com a lista ordenada por início)."""
+    used = set(_ASSIGNED.values())
+    for n in names:
+        k = normalize(short_course(n))
+        if not k or k in _ASSIGNED:
+            continue
+        free = [c for c in COURSE_PALETTE if c not in used]
+        _ASSIGNED[k] = free[0] if free else COURSE_PALETTE[len(_ASSIGNED) % len(COURSE_PALETTE)]
+        used.add(_ASSIGNED[k])
+
+
 def course_color(name: Optional[str]) -> str:
     if not name or name == MISSING:
         return "#64748B"
-    h = int(hashlib.md5(normalize(short_course(name)).encode()).hexdigest(), 16)
+    k = normalize(short_course(name))
+    if k in _ASSIGNED:
+        return _ASSIGNED[k]
+    h = int(hashlib.md5(k.encode()).hexdigest(), 16)
     return COURSE_PALETTE[h % len(COURSE_PALETTE)]
 
 

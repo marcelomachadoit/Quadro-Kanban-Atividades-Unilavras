@@ -17,6 +17,18 @@ class AppContext(QObject):
         super().__init__()
         self.db = db
         self.creds = creds or CredentialStore()
+        self.data_changed.connect(self.register_colors)
+        self.register_colors()
+
+    def register_colors(self) -> None:
+        """Cores das disciplinas estáveis e sem repetição (ordem: início da disciplina, depois nome)."""
+        from app.ui.format import register_courses
+        try:
+            names = [c["name"] for c in self.db.list_course_info()]
+            names += sorted({a.course for a in self.db.list_activities(include_deleted=True)})
+            register_courses(names)
+        except Exception:  # noqa: BLE001 — cor é cosmética; nunca impedir a abertura
+            pass
 
     # preferências (não sensíveis) ficam na tabela meta
     @property

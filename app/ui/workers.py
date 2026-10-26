@@ -32,6 +32,48 @@ class UpdateWorker(QThread):
         self.finished_report.emit(up.run())
 
 
+class GradesWorker(QThread):
+    """Roda somente a leitura de notas (Grade de Notas + AVIN)."""
+    progress = Signal(object)
+    finished_report = Signal(object)
+
+    def __init__(self, ctx, creds: Credentials, parent=None):
+        super().__init__(parent)
+        self.ctx = ctx
+        self.creds = creds
+        self.cancel_event = threading.Event()
+
+    def cancel(self) -> None:
+        self.cancel_event.set()
+
+    def run(self) -> None:
+        from app.services.grades_updater import GradesUpdater
+        up = GradesUpdater(self.ctx.db, self.creds, headless=not self.ctx.show_browser, labels=self.ctx.labels(),
+                           cancel=self.cancel_event, on_progress=self.progress.emit)
+        self.finished_report.emit(up.run())
+
+
+class WeeklyWorker(QThread):
+    """Atualização semanal automática: atividades + notas/AVIN em uma única sessão."""
+    progress = Signal(object)
+    finished_report = Signal(object)
+
+    def __init__(self, ctx, creds: Credentials, parent=None):
+        super().__init__(parent)
+        self.ctx = ctx
+        self.creds = creds
+        self.cancel_event = threading.Event()
+
+    def cancel(self) -> None:
+        self.cancel_event.set()
+
+    def run(self) -> None:
+        from app.services.weekly import WeeklyUpdater
+        up = WeeklyUpdater(self.ctx.db, self.creds, headless=not self.ctx.show_browser, labels=self.ctx.labels(),
+                           cancel=self.cancel_event, on_progress=self.progress.emit)
+        self.finished_report.emit(up.run())
+
+
 class TestConnectionWorker(QThread):
     done = Signal(bool, str)
 

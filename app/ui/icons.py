@@ -12,9 +12,9 @@ GLYPHS = {
     "more": "", "filter": "", "clock": "", "calendar": "", "info": "",
     "warning": "", "list": "", "close": "", "eye": "", "eye_off": "",
     "save": "", "trophy": "", "restore": "", "download": "", "upload": "",
-    "folder": "", "lock": "", "user": "", "chevron_down": "", "chevron_right": "",
+    "folder": "", "lock": "", "user": "", "chevron_down": "", "chevron_right": "", "chevron_left": "",
     "circle": "", "check_circle": "", "help": "", "globe": "", "error": "",
-    "trash": "", "star": "",
+    "trash": "", "star": "", "education": "",
 }
 
 

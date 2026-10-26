@@ -260,7 +260,8 @@ class LoadingBar(QFrame):
         lay.addWidget(self.manual, 3)
         self.hide()
 
-    def start(self) -> None:
+    def start(self, title: str = "Carregando dados do portal…") -> None:
+        self.title.setText(title)
         self.bar.setRange(0, 0)
         self.detail.setText("Conectando ao portal")
         self.cancel_btn.setEnabled(True)
@@ -304,3 +305,63 @@ def clear_layout(layout) -> None:
             w.deleteLater()
         elif it.layout() is not None:
             clear_layout(it.layout())
+
+
+class NotificationCard(QFrame):
+    """Cartão de notificação fixo no canto inferior direito enquanto uma tarefa automática roda."""
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setObjectName("NotificationCard")
+        self.setStyleSheet(f"QFrame#NotificationCard {{ background:white; border:1px solid {COLORS['border']};"
+                           f" border-left:4px solid {COLORS['primary']}; border-radius:12px; }}"
+                           "QFrame#NotificationCard QLabel { background: transparent; border: none; }")
+        self.setFixedWidth(380)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(14, 12, 12, 12)
+        lay.setSpacing(12)
+        self.ic = icon_label("sync", COLORS["primary"], 20)
+        lay.addWidget(self.ic, 0, Qt.AlignTop)
+        v = QVBoxLayout()
+        v.setSpacing(2)
+        self.title = label("", "H3", wrap=True)
+        self.detail = label("", "Small", wrap=True)
+        self.hint = label("Você pode continuar usando o aplicativo.", "Small", wrap=True)
+        v.addWidget(self.title)
+        v.addWidget(self.detail)
+        v.addWidget(self.hint)
+        lay.addLayout(v, 1)
+        self.cancel_btn = icon_button("close", "Interromper", size=12)
+        lay.addWidget(self.cancel_btn, 0, Qt.AlignTop)
+        try:
+            from PySide6.QtWidgets import QGraphicsDropShadowEffect
+            from PySide6.QtGui import QColor
+            sh = QGraphicsDropShadowEffect(self)
+            sh.setBlurRadius(28)
+            sh.setOffset(0, 6)
+            sh.setColor(QColor(15, 23, 42, 40))
+            self.setGraphicsEffect(sh)
+        except Exception:  # noqa: BLE001
+            pass
+        self.hide()
+
+    def show_message(self, title: str, detail: str = "") -> None:
+        self.title.setText(title)
+        self.detail.setText(detail)
+        self.detail.setVisible(bool(detail))
+        self.adjustSize()
+        self.reposition()
+        self.show()
+        self.raise_()
+
+    def set_detail(self, detail: str) -> None:
+        self.detail.setText(detail)
+        self.detail.setVisible(bool(detail))
+        self.adjustSize()
+        self.reposition()
+
+    def reposition(self) -> None:
+        p = self.parentWidget()
+        if p:
+            self.adjustSize()
+            self.move(p.width() - self.width() - 24, p.height() - self.height() - 24)

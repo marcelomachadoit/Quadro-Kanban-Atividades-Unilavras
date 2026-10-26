@@ -26,6 +26,9 @@ log = logging.getLogger(__name__)
 
 COURSES_API = re.compile(r"/plataforma/academic/courses/me\?")
 CONTENTS_API = re.compile(r"/plataforma/content/academics-main/(\d+)/contents")
+GRADES_API = re.compile(r"/plataforma/grades/courses/(\d+)/me")
+AVIN_TABLE = re.compile(r"/ResultadoAluno/Tabela/?\?", re.I)
+AVIN_ANSWERS = re.compile(r"/ResultadoAluno/FormularioRespostas\?idAlunoAvaliacao=(\d+)", re.I)
 
 
 class AutomationError(RuntimeError):
@@ -70,6 +73,9 @@ class PortalLabels:
     """Rótulos usados para localizar elementos (editáveis nas configurações caso o portal mude)."""
     classroom_tile: str = "Sala de Aula Virtual"
     courses_menu: str = "Disciplinas"
+    grades_link: str = "Grade de Notas"
+    avin_tile: str = "AVIN"
+    avin_results_menu: str = "Resultados"
 
 
 ProgressFn = Callable[[str], None]
@@ -97,6 +103,8 @@ class PortalClient:
         self.portal: Optional[Page] = None
         self.lxp: Optional[Page] = None
         self.lxp_base: str = ""
+        self.avin: Optional[Page] = None
+        self.avin_base: str = ""
         self._creds: Optional[Credentials] = None
 
     # ---------------------------------------------------------------- ciclo de vida
@@ -370,6 +378,140 @@ class PortalClient:
         data = self._retry(f"Abrir a disciplina {course.name}", go)
         self._wait(lx, POLITE_DELAY_MS)
         return data
+
+    # ---------------------------------------------------------------- notas da disciplina
+    def course_grades(self, course: Course) -> dict:
+        """Abre "Grade de Notas" da disciplina (a página atual deve ser a da disciplina) e lê os dados da página."""
+        self.check_cancel()
+        lx = self.lxp
+        cid = str(course.source_id)
+        link = lx.get_by_text(re.compile(rf"^\s*{re.escape(self.labels.grades_link)}\s*$", re.I)).first
+
+        def match(r) -> bool:
+            m = GRADES_API.search(r.url)
+            return bool(m) and m.group(1) == cid and r.request.method == "GET"
+
+        def via_link():
+            link.wait_for(state="visible", timeout=NAV_TIMEOUT_MS)
+            with lx.expect_response(match, timeout=NAV_TIMEOUT_MS) as resp:
+                link.click()
+            return self._json(resp.value)
+
+        def via_url():
+            with lx.expect_response(match, timeout=NAV_TIMEOUT_MS) as resp:
+                lx.goto(f"{self.lxp_base}/plataforma/my-grades/{cid}", wait_until="domcontentloaded")
+            return self._json(resp.value)
+
+        try:
+            data = self._retry(f"Abrir as notas de {course.name}", via_link)
+        except StructureChanged:
+            raise
+        except AutomationError:
+            log.warning("Link \"%s\" não respondeu; abrindo a página de notas diretamente.", self.labels.grades_link)
+            data = self._retry(f"Abrir as notas de {course.name}", via_url)
+        self._wait(lx, POLITE_DELAY_MS)
+        return data
+
+    # ---------------------------------------------------------------- AVIN (avalia.grupoa.com.br)
+    def open_avin(self) -> None:
+        """Clica no bloco AVIN do portal (abre o sistema de avaliações em outra aba)."""
+        self.check_cancel()
+        self.on_step("Acessando o AVIN")
+        p = self.portal
+        if not urlsplit(p.url).path.startswith("/portal"):
+            self._retry("Abrir o portal", lambda: p.goto("https://novoportal.unilavras.edu.br/portal"))
+            if not self._wait_logged_in(p, 10):
+                raise SessionExpired("A sessão do portal expirou.")
+        p.bring_to_front()
+        label = self.labels.avin_tile
+        tile = p.locator("button.platform-link, app-tile button").filter(
+            has=p.locator(".title", has_text=re.compile(rf"^\s*{re.escape(label)}\s*$", re.I)))
+        try:
+            tile.first.wait_for(state="visible", timeout=NAV_TIMEOUT_MS)
+        except PWTimeout as e:
+            raise StructureChanged(f"Não encontrei a opção \"{label}\" no portal. Opções disponíveis: "
+                                   f"{', '.join(self._tile_titles(p)) or 'nenhuma'}.") from e
+        with self._ctx.expect_page(timeout=NAV_TIMEOUT_MS) as newp:
+            tile.first.click()
+        self.avin = newp.value
+        self.avin.wait_for_load_state("domcontentloaded")
+        menu = self.avin.locator("a[href*='ResultadoAluno']").first
+        try:
+            menu.wait_for(state="attached", timeout=NAV_TIMEOUT_MS)
+        except PWTimeout as e:
+            if re.search(r"login", self.avin.url, re.I):
+                raise SessionExpired("O AVIN pediu nova autenticação.") from e
+            raise StructureChanged("O AVIN abriu, mas o menu \"Resultados\" não apareceu.") from e
+        s = urlsplit(self.avin.url)
+        self.avin_base = f"{s.scheme}://{s.netloc}"
+        log.info("AVIN aberto em %s", self.avin_base)
+
+    def _collect(self, page: Page, pattern: re.Pattern) -> list:
+        found: list = []
+        page.on("response", lambda r: found.append(r) if pattern.search(r.url) else None)
+        return found
+
+    def _wait_for(self, page: Page, found: list, pred, seconds: int):
+        for _ in range(seconds * 4):
+            self.check_cancel()
+            for r in reversed(found):
+                if pred(r):
+                    return r
+            page.wait_for_timeout(250)
+        return None
+
+    def avin_results_table(self) -> str:
+        """Resultados > "Resultados disponíveis" ligado e "Resultados de avaliações em andamento" desligado.
+        Retorna o HTML da tabela carregada pela página."""
+        self.check_cancel()
+        self.on_step("Abrindo os resultados do AVIN")
+        av = self.avin
+        found = self._collect(av, AVIN_TABLE)
+        menu = av.get_by_role("link", name=re.compile(rf"^\s*{re.escape(self.labels.avin_results_menu)}\s*$", re.I))
+        if menu.count():
+            menu.first.click()
+        else:
+            av.goto(f"{self.avin_base}/ResultadoAluno/Index")
+        try:
+            av.locator("#resultadosDisponveis, #avaliacoesVigentes").first.wait_for(state="attached",
+                                                                                   timeout=NAV_TIMEOUT_MS)
+        except PWTimeout as e:
+            raise StructureChanged("A página de resultados do AVIN não mostrou os filtros esperados.") from e
+        self._wait_for(av, found, lambda r: True, 15)       # carga inicial da tabela
+        for sel, want in (("#resultadosDisponveis", True), ("#avaliacoesVigentes", False)):
+            cur = av.evaluate(f"() => {{ const e = document.querySelector('{sel}'); return e ? e.checked : null; }}")
+            if cur is None:
+                raise StructureChanged("Os filtros de resultados do AVIN mudaram de nome.")
+            if cur != want:
+                sw = av.locator(f"{sel} + .switchery")
+                if sw.count():
+                    sw.first.click()
+                else:
+                    av.evaluate(f"() => document.querySelector('{sel}').click()")
+                av.wait_for_timeout(POLITE_DELAY_MS)
+
+        def wanted(r) -> bool:
+            u = r.url.lower()
+            return "apenasavaliacoesvigentes=false" in u and "apenasresultadosdisponiveis=true" in u
+        r = self._wait_for(av, found, wanted, 30)
+        if r is None:
+            raise AutomationError("A tabela de resultados do AVIN não carregou. Tente novamente mais tarde.")
+        if r.status >= 400:
+            raise AutomationError(f"O AVIN respondeu com erro {r.status} ao listar resultados.")
+        return r.text()
+
+    def avin_answers(self, results_href: str, avin_id: str) -> str:
+        """Abre "Visualizar Resultados" de uma avaliação e retorna o HTML das respostas."""
+        self.check_cancel()
+        av = self.avin
+        found = self._collect(av, AVIN_ANSWERS)
+        url = results_href if results_href.startswith("http") else f"{self.avin_base}{results_href}"
+        self._retry("Abrir resultado do AVIN", lambda: av.goto(url, wait_until="domcontentloaded"))
+        r = self._wait_for(av, found, lambda r: AVIN_ANSWERS.search(r.url).group(1) == str(avin_id), 30)
+        if r is None:
+            raise AutomationError("As respostas do AVIN não carregaram.")
+        self._wait(av, POLITE_DELAY_MS)
+        return r.text()
 
     def back_to_courses(self) -> None:
         try:

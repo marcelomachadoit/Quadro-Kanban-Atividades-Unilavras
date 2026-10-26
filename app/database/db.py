@@ -53,6 +53,23 @@ CREATE TABLE IF NOT EXISTS meta (
     value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS grade_snapshots (
+    key        TEXT PRIMARY KEY,          -- "course:<id>" ou "avin:<id>"
+    kind       TEXT NOT NULL,             -- "course" | "avin"
+    payload    TEXT NOT NULL,             -- JSON
+    sort_key   TEXT,                      -- data de início (ordem cronológica)
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS course_info (
+    course_id  TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    start_date TEXT,
+    progress   REAL,
+    meetings   TEXT,                      -- JSON; NULL = ainda não lido
+    updated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS sync_runs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at  TEXT NOT NULL,
@@ -246,6 +263,53 @@ class Database:
             for i, aid in enumerate(ordered_ids):
                 c.execute("UPDATE activities SET position=?, status=?, updated_at=? WHERE id=?",
                           (float(i), status, now_iso(), aid))
+
+    # ------------------------------------------------------------ notas
+    def save_grade_snapshot(self, key: str, kind: str, payload: dict, sort_key: Optional[str]) -> None:
+        """Grava (ou substitui) as notas mais recentes de uma disciplina ou de um AVIN."""
+        with self.transaction() as c:
+            c.execute("INSERT INTO grade_snapshots(key, kind, payload, sort_key, updated_at) VALUES(?,?,?,?,?) "
+                      "ON CONFLICT(key) DO UPDATE SET kind=excluded.kind, payload=excluded.payload, "
+                      "sort_key=excluded.sort_key, updated_at=excluded.updated_at",
+                      (key, kind, json.dumps(payload, ensure_ascii=False), sort_key, now_iso()))
+
+    def list_grade_snapshots(self) -> list[tuple[str, dict, Optional[str]]]:
+        """[(kind, payload, updated_at)] em ordem cronológica de início."""
+        with self._lock:
+            rows = self.conn.execute("SELECT kind, payload, updated_at FROM grade_snapshots "
+                                     "ORDER BY COALESCE(sort_key, '9999'), key").fetchall()
+        out = []
+        for r in rows:
+            try:
+                out.append((r["kind"], json.loads(r["payload"]), r["updated_at"]))
+            except (TypeError, ValueError):
+                log.warning("Registro de notas ilegível ignorado")
+        return out
+
+    # ------------------------------------------------------------ disciplinas e encontros virtuais
+    def save_course_info(self, course_id: str, name: str, start_date: Optional[str], progress: Optional[float],
+                         meetings: Optional[list] = None) -> None:
+        """Atualiza nome/início/progresso; ``meetings=None`` mantém os encontros já conhecidos."""
+        mj = json.dumps(meetings, ensure_ascii=False) if meetings is not None else None
+        with self.transaction() as c:
+            c.execute("INSERT INTO course_info(course_id, name, start_date, progress, meetings, updated_at) "
+                      "VALUES(?,?,?,?,?,?) ON CONFLICT(course_id) DO UPDATE SET name=excluded.name, "
+                      "start_date=excluded.start_date, progress=excluded.progress, "
+                      "meetings=COALESCE(excluded.meetings, course_info.meetings), updated_at=excluded.updated_at",
+                      (str(course_id), name, start_date, progress, mj, now_iso()))
+
+    def list_course_info(self) -> list[dict]:
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM course_info ORDER BY COALESCE(start_date, '9999'), name").fetchall()
+        out = []
+        for r in rows:
+            try:
+                meetings = json.loads(r["meetings"]) if r["meetings"] else []
+            except ValueError:
+                meetings = []
+            out.append({"course_id": r["course_id"], "name": r["name"], "start_date": r["start_date"],
+                        "progress": r["progress"], "meetings": meetings})
+        return out
 
     # ------------------------------------------------------------ histórico de sincronização
     def start_run(self) -> int:
