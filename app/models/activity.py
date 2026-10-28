@@ -141,6 +141,12 @@ class Activity:
             return dt.strftime("%d/%m/%Y")
         return dt.strftime("%d/%m/%Y %H:%M")
 
+    @property
+    def is_exam(self) -> bool:
+        """Provas aparecem só na agenda (categoria Prova), fora do quadro de atividades."""
+        from app.services.rules import is_exam
+        return is_exam(self.name)
+
     def is_overridden(self, f: str) -> bool:
         return getattr(self, f"user_{f}") is not None
 

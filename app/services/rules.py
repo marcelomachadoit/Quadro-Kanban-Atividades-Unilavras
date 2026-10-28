@@ -249,6 +249,14 @@ def looks_like_assessment(name: str, context: str = "", kind: str = "") -> bool:
     return bool(extract_points(context))
 
 
+EXAM_RE = re.compile(r"\b(prova|exame)\b", re.I)
+
+
+def is_exam(name: Optional[str]) -> bool:
+    """Prova (presencial, com data marcada) — vai para a agenda, e não para o quadro de atividades."""
+    return bool(EXAM_RE.search(normalize(name)))
+
+
 DUE_NONE, DUE_EXPIRED, DUE_SOON, DUE_FUTURE = "sem_prazo", "expirado", "proximo", "futuro"
 
 

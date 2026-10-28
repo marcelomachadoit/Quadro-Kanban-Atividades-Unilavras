@@ -18,6 +18,9 @@ URG_OVERDUE, URG_SOON, URG_WEEK, URG_LATER, URG_NONE, URG_DONE = "atrasada", "ur
 COURSE_PALETTE = ["#2563EB", "#0D9488", "#7C3AED", "#DB2777", "#EA580C", "#059669", "#4F46E5", "#B45309", "#0891B2",
                   "#9333EA"]
 
+CATEGORY_COLORS = {"Aula": "#2563EB", "Prova": "#DC2626", "Estudo": "#059669", "Trabalho": "#D97706",
+                   "Evento": "#7C3AED", "Pessoal": "#DB2777"}     # cor de destaque das categorias da agenda
+
 _CODE_RE = re.compile(r"\s*\(([A-Z]{2,}[A-Z0-9]*\d+[A-Z0-9]*)\)\s*$")
 
 
@@ -41,6 +44,10 @@ def register_courses(names: list[str]) -> None:
         free = [c for c in COURSE_PALETTE if c not in used]
         _ASSIGNED[k] = free[0] if free else COURSE_PALETTE[len(_ASSIGNED) % len(COURSE_PALETTE)]
         used.add(_ASSIGNED[k])
+
+
+def category_color(category: str) -> str:
+    return CATEGORY_COLORS.get(category, "#64748B")
 
 
 def course_color(name: Optional[str]) -> str:

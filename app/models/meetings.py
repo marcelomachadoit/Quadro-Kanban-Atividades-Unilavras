@@ -34,6 +34,8 @@ class CourseInfo:
     start_date: Optional[str]
     progress: Optional[float]
     meetings: list = field(default_factory=list)    # list[Meeting]
+    avin_date: Optional[str] = None                 # AAAA-MM-DD, do Planograma da disciplina
+    planograma_rev: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -70,6 +72,19 @@ def next_meeting(info: CourseInfo, now: Optional[datetime] = None) -> Optional[t
             continue                                     # encontro de hoje já passou
         return d, m
     return None
+
+
+def avin_days(courses: list[CourseInfo], first: date, last: date) -> dict[date, list[str]]:
+    """Datas de AVIN (do Planograma) entre ``first`` e ``last``, com as disciplinas em andamento que as indicam.
+    O AVIN é do módulo: disciplinas que informam a mesma data viram um único compromisso."""
+    done = completed_ids(courses, first)
+    out: dict[date, list[str]] = {}
+    for c in courses:
+        if c.avin_date and c.course_id not in done:
+            d = date.fromisoformat(c.avin_date)
+            if first <= d <= last:
+                out.setdefault(d, []).append(c.name)
+    return dict(sorted(out.items()))
 
 
 def completed_ids(courses: list[CourseInfo], today: Optional[date] = None) -> set[str]:

@@ -13,25 +13,6 @@ from app.services.updater import Progress, Updater
 log = logging.getLogger(__name__)
 
 
-class UpdateWorker(QThread):
-    progress = Signal(object)    # Progress
-    finished_report = Signal(object)
-
-    def __init__(self, ctx, creds: Credentials, parent=None):
-        super().__init__(parent)
-        self.ctx = ctx
-        self.creds = creds
-        self.cancel_event = threading.Event()
-
-    def cancel(self) -> None:
-        self.cancel_event.set()
-
-    def run(self) -> None:
-        up = Updater(self.ctx.db, self.creds, headless=not self.ctx.show_browser, labels=self.ctx.labels(),
-                     cancel=self.cancel_event, on_progress=self.progress.emit)
-        self.finished_report.emit(up.run())
-
-
 class GradesWorker(QThread):
     """Roda somente a leitura de notas (Grade de Notas + AVIN)."""
     progress = Signal(object)
@@ -53,8 +34,8 @@ class GradesWorker(QThread):
         self.finished_report.emit(up.run())
 
 
-class WeeklyWorker(QThread):
-    """Atualização semanal automática: atividades + notas/AVIN em uma única sessão."""
+class FullWorker(QThread):
+    """Atualização completa (botão "Atualizar agora" e atualização semanal): atividades + notas/AVIN + eventos."""
     progress = Signal(object)
     finished_report = Signal(object)
 
@@ -68,9 +49,29 @@ class WeeklyWorker(QThread):
         self.cancel_event.set()
 
     def run(self) -> None:
-        from app.services.weekly import WeeklyUpdater
-        up = WeeklyUpdater(self.ctx.db, self.creds, headless=not self.ctx.show_browser, labels=self.ctx.labels(),
-                           cancel=self.cancel_event, on_progress=self.progress.emit)
+        from app.services.weekly import FullUpdater
+        up = FullUpdater(self.ctx.db, self.creds, headless=not self.ctx.show_browser, labels=self.ctx.labels(),
+                         cancel=self.cancel_event, on_progress=self.progress.emit)
+        self.finished_report.emit(up.run())
+
+
+class EventsWorker(QThread):
+    """Somente os eventos da Unilavras (página pública: não usa login nem o navegador)."""
+    progress = Signal(object)
+    finished_report = Signal(object)
+
+    def __init__(self, ctx, parent=None):
+        super().__init__(parent)
+        self.ctx = ctx
+        self.cancel_event = threading.Event()
+
+    def cancel(self) -> None:
+        self.cancel_event.set()
+
+    def run(self) -> None:
+        from app.services.events import EventsUpdater
+        up = EventsUpdater(self.ctx.db, cancel=self.cancel_event,
+                           on_step=lambda s: self.progress.emit(Progress(step=s)))
         self.finished_report.emit(up.run())
 
 

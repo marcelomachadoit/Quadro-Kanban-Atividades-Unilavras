@@ -78,8 +78,8 @@ class ActivityPanel(QFrame):
         self.name.setPlaceholderText("Nome da atividade")
         self.name.setFixedHeight(64)
         self.name.setStyleSheet("QPlainTextEdit { font-size: 13pt; font-weight: 700; border: 1px solid transparent; "
-                                "padding: 2px; } QPlainTextEdit:hover { border-color: #E2E8F0; } "
-                                "QPlainTextEdit:focus { border-color: #2563EB; }")
+                                f"padding: 2px; }} QPlainTextEdit:hover {{ border-color: {COLORS['border']}; }} "
+                                f"QPlainTextEdit:focus {{ border-color: {COLORS['primary']}; }}")
         self.name.setTabChangesFocus(True)
         self.v.addWidget(self.name)
         self.pills = QHBoxLayout()
@@ -154,7 +154,7 @@ class ActivityPanel(QFrame):
 
         # rodapé de ações
         foot = QFrame()
-        foot.setStyleSheet(f"QFrame {{ border-top: 1px solid {COLORS['border']}; background: white; }}")
+        foot.setStyleSheet(f"QFrame {{ border-top: 1px solid {COLORS['border']}; background: {COLORS['surface']}; }}")
         fl = QHBoxLayout(foot)
         fl.setContentsMargins(18, 12, 18, 12)
         self.open_btn = button("Abrir no portal", "", "open", tip="Abrir a página da atividade no navegador",
@@ -281,7 +281,7 @@ class ActivityPanel(QFrame):
     def _conflict_box(self, c: dict) -> QFrame:
         f = c.get("field")
         box = QFrame()
-        box.setStyleSheet(f"QFrame {{ background:{COLORS['warn_bg']}; border:1px solid #FDE68A; border-radius:10px; }}"
+        box.setStyleSheet(f"QFrame {{ background:{COLORS['warn_bg']}; border:1px solid {COLORS['warn_border']}; border-radius:10px; }}"
                           f"QLabel {{ color:{COLORS['warn_text']}; border:none; background:transparent; }}")
         v = QVBoxLayout(box)
         v.setContentsMargins(12, 10, 12, 10)

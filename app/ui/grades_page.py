@@ -17,16 +17,17 @@ from app.ui.format import course_color, plural, relative_time, short_course
 from app.ui.theme import COLORS
 from app.ui.widgets import Dot, EmptyState, Pill, button, clear_layout, icon_label, label
 
-AVIN_COLOR = "#7C3AED"
 
-Q_STYLE = {   # (texto, fundo, símbolo) — símbolo garante leitura sem depender da cor
-    Q_CORRECT: (COLORS["ok_text"], COLORS["ok_bg"], "✓"),
-    Q_WRONG: (COLORS["danger_text"], COLORS["danger_bg"], "✗"),
-    Q_DOUBLE: ("#6B21A8", "#F3E8FF", "≡"),
-    Q_BLANK: (COLORS["neutral_text"], COLORS["neutral_bg"], "–"),
-    Q_ANNULLED: (COLORS["warn_text"], COLORS["warn_bg"], "Ø"),
-    Q_WAIVED: (COLORS["neutral_text"], COLORS["neutral_bg"], "•"),
-}
+def q_style() -> dict:
+    """(texto, fundo, símbolo) por situação da questão — símbolo garante leitura sem depender da cor."""
+    return {
+        Q_CORRECT: (COLORS["ok_text"], COLORS["ok_bg"], "✓"),
+        Q_WRONG: (COLORS["danger_text"], COLORS["danger_bg"], "✗"),
+        Q_DOUBLE: (COLORS["violet_text"], COLORS["violet_bg"], "≡"),
+        Q_BLANK: (COLORS["neutral_text"], COLORS["neutral_bg"], "–"),
+        Q_ANNULLED: (COLORS["warn_text"], COLORS["warn_bg"], "Ø"),
+        Q_WAIVED: (COLORS["neutral_text"], COLORS["neutral_bg"], "•"),
+    }
 
 
 def short_avin(name: str) -> str:
@@ -264,7 +265,7 @@ class GradesPage(QWidget):
         sec = label(f"AVIN DO MÓDULO  ·  {fmt_num(av.score)} de {fmt_num(av.max_score)}"
                     + ("" if counted else "  (não somado)"), "Section")
         sec.setContentsMargins(0, 12, 0, 4)
-        sec.setStyleSheet(f"color:{AVIN_COLOR};")
+        sec.setStyleSheet(f"color:{COLORS['violet']};")
         b.addWidget(sec)
         b.addWidget(label(f"{short_avin(av.name)} · prova em {_date(av.start, True)}", "Small"))
         b.addWidget(label(f"<b>{av.correct}</b> {'acerto' if av.correct == 1 else 'acertos'} × "
@@ -282,8 +283,9 @@ class GradesPage(QWidget):
         grid = QGridLayout()
         grid.setSpacing(6)
         grid.setContentsMargins(0, 8, 0, 4)
+        styles = q_style()
         for i, q in enumerate(av.questions):
-            fg, bg, sym = Q_STYLE.get(q.state, Q_STYLE[Q_BLANK])
+            fg, bg, sym = styles.get(q.state, styles[Q_BLANK])
             cell = label(f"{sym}  {q.number}. {q.answer}")
             cell.setAlignment(Qt.AlignCenter)
             cell.setMinimumWidth(78)
@@ -293,7 +295,7 @@ class GradesPage(QWidget):
         b.addLayout(grid)
         legend = QHBoxLayout()
         for s in (Q_CORRECT, Q_WRONG):
-            fg, bg, sym = Q_STYLE[s]
+            fg, bg, sym = q_style()[s]
             legend.addWidget(label(f"<span style='color:{fg}'>{sym}</span> {Q_LABELS[s]}", "Small"))
         legend.addStretch(1)
         b.addLayout(legend)

@@ -6,14 +6,18 @@ import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-APP_NAME = "UniKanban"
-APP_TITLE = "UniKanban — Tarefas Unilavras"
-APP_VERSION = "1.0.0"
+APP_NAME = "UniSpace"
+APP_TITLE = "UniSpace — Unilavras"
+APP_VERSION = "1.1.0"
+APP_AUTHOR = "Marcelo Machado"
+APP_AUTHOR_EMAIL = "marcelomachadoit@gmail.com"
+LEGACY_APP_NAME = "UniKanban"   # nome antigo: pasta de dados e cofre são migrados na primeira abertura
 
 TZ = ZoneInfo("America/Sao_Paulo")
 
 PORTAL_LOGIN_URL = "https://novoportal.unilavras.edu.br/sessions/login"
 PORTAL_HOST = "novoportal.unilavras.edu.br"
+EVENTS_URL = "https://eventos.unilavras.edu.br/"   # aba "Eventos > Inscrição" do portal (página pública)
 
 # Regras de negócio
 COMPLETION_THRESHOLD = 95.0     # processar somente disciplinas com conclusão < 95%
@@ -29,19 +33,37 @@ MAX_PAGES_PER_COURSE = 60       # trava de segurança contra loops de navegaçã
 POLITE_DELAY_MS = 600           # pausa curta entre páginas para não sobrecarregar o portal
 
 
+def _local_appdata() -> Path:
+    return Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local"))
+
+
 def _data_dir() -> Path:
-    override = os.environ.get("UNIKANBAN_DATA_DIR")
+    override = os.environ.get("UNISPACE_DATA_DIR")
     if override:
         return Path(override)
-    base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-    return Path(base) / APP_NAME
+    return _local_appdata() / APP_NAME
 
 
 DATA_DIR = _data_dir()
-DB_PATH = DATA_DIR / "unikanban.db"
+DB_PATH = DATA_DIR / "unispace.db"
 LOG_DIR = DATA_DIR / "logs"
 BROWSER_PROFILE_DIR = DATA_DIR / "chrome-profile"
 DIAG_DIR = DATA_DIR / "diagnostico"
+
+
+def migrate_legacy_data() -> bool:
+    """Leva os dados do UniKanban (nome antigo) para a pasta do UniSpace. Só age se a pasta nova ainda não existe."""
+    if os.environ.get("UNISPACE_DATA_DIR"):
+        return False
+    old = _local_appdata() / LEGACY_APP_NAME
+    if DATA_DIR.exists() or not old.is_dir():
+        return False
+    old.rename(DATA_DIR)
+    for suffix in ("", "-wal", "-shm"):
+        f = DATA_DIR / f"unikanban.db{suffix}"
+        if f.exists():
+            f.rename(DATA_DIR / f"unispace.db{suffix}")
+    return True
 
 
 def ensure_dirs() -> None:

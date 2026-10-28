@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Callable, Optional
 
 from app.automation import parser as P
+from app.automation import planograma as PL
 from app.automation.meetings_parser import extract_meetings
 from app.automation.portal import (AutomationError, Cancelled, HumanVerificationRequired, LoginFailed, PortalClient,
                                    PortalLabels,
@@ -169,6 +170,30 @@ class Updater:
             return
         report.auto_completed += apply_submissions(self.db, grades.get("name") or course_name, grades)
 
+    def _read_avin_date(self, c: PortalClient, co: Course, contents: dict) -> None:
+        """Lê a data do AVIN no PDF do Planograma; só baixa de novo quando o professor troca o documento.
+        Falha aqui não invalida a coleta (a agenda apenas fica sem o AVIN desta disciplina)."""
+        topic = PL.find_planograma_topic(contents)
+        if topic is None:
+            return
+        rev = PL.topic_revision(topic)
+        known = next((i for i in self.db.list_course_info() if i["course_id"] == str(co.source_id)), None)
+        if known and known["planograma_rev"] == rev:
+            return
+        try:
+            url = PL.pdf_url(c.course_topic(co, topic.get("id")))
+            if not url:
+                log.warning("Planograma de %s sem PDF reconhecível.", co.name)
+                return
+            avin = PL.parse_avin_date(PL.pdf_text(c.download(url)))
+        except (Cancelled, LoginFailed, SessionExpired):
+            raise
+        except Exception as e:  # noqa: BLE001
+            log.warning("Não foi possível ler o Planograma de %s: %s", co.name, str(e).splitlines()[0] if str(e) else e)
+            return
+        self.db.save_course_avin(co.source_id, avin.isoformat() if avin else None, rev)
+        log.info("Planograma de %s lido: AVIN %s", co.name, avin.strftime("%d/%m/%Y") if avin else "a definir")
+
     def _load_courses(self, c: PortalClient, report: SyncReport) -> list[Course]:
         return load_courses(c)
 
@@ -187,6 +212,7 @@ class Updater:
                                (data.get("context") or {}).get("academicMainName") or co.name)
                 sync.apply(acts, [course_name], report=report)
                 self._mark_submitted(c, co, course_name, report)
+                self._read_avin_date(c, co, data)          # por último: sai da página da disciplina
                 report.courses_processed.append(co.name)
                 log.info("Disciplina processada: %s (%s atividades vigentes)", co.name, len(acts))
                 return

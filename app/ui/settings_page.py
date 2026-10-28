@@ -104,12 +104,12 @@ class SettingsPage(QWidget):
 
         # ---- atualização
         box, v = section("Atualização", icon_name="sync")
-        self.show_browser = QCheckBox("Mostrar a janela do Chrome durante a atualização")
+        self.show_browser = QCheckBox("Mostrar a janela do navegador durante a atualização")
         self.show_browser.setChecked(self.ctx.show_browser)
         self.show_browser.toggled.connect(lambda c: setattr(self.ctx, "show_browser", c))
         v.addWidget(self.show_browser)
         v.addWidget(label("Normalmente a atualização roda em segundo plano. Ative só se a sua conta usar login "
-                          "Microsoft 365 ou verificação em duas etapas, para concluí-las na janela do Chrome.",
+                          "Microsoft 365 ou verificação em duas etapas, para concluí-las na janela do navegador.",
                           "Small", wrap=True))
         lay.addWidget(box)
 
@@ -278,7 +278,7 @@ class SettingsPage(QWidget):
             self._run(lambda: exporter.export_csv(self.ctx.db.list_activities(), path), "Arquivo CSV exportado", path)
 
     def backup(self) -> None:
-        path = self._ask_save("Salvar backup", f"unikanban_backup_{self._stamp()}.db", "Backup UniKanban (*.db)")
+        path = self._ask_save("Salvar backup", f"unispace_backup_{self._stamp()}.db", "Backup UniSpace (*.db)")
         if path:
             self._run(lambda: exporter.backup_database(self.ctx.db.conn, path), "Backup salvo", path)
 
@@ -287,7 +287,7 @@ class SettingsPage(QWidget):
             QMessageBox.information(self, "Restaurar backup", "Aguarde a atualização em andamento terminar.")
             return
         path, _ = QFileDialog.getOpenFileName(self, "Restaurar backup", os.path.expanduser("~"),
-                                              "Backup UniKanban (*.db)")
+                                              "Backup UniSpace (*.db)")
         if not path:
             return
         try:

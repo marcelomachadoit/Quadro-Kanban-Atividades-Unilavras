@@ -1,6 +1,6 @@
-# UniKanban — Gerenciador de Atividades Unilavras
+# UniSpace — Seu espaço na Unilavras
 
-Aplicativo desktop para Windows que entra no portal do aluno Unilavras, abre a **Sala de Aula Virtual**, verifica as **disciplinas com menos de 95% de conclusão**, coleta as atividades e avaliações **com prazo vigente ou pontuação** e organiza tudo em um **quadro Kanban** editável e salvo no seu computador.
+Aplicativo desktop para Windows que entra no portal do aluno Unilavras, abre a **Sala de Aula Virtual**, verifica as **disciplinas com menos de 95% de conclusão**, coleta as atividades e avaliações **com prazo vigente ou pontuação** e organiza tudo em um **Quadro de Atividades** editável e salvo no seu computador. Também reúne as **notas** e o **AVIN**, os **encontros virtuais**, os **eventos da Unilavras** e uma **agenda** pessoal, com **modo noturno**.
 
 > A automação é **somente leitura**: ela nunca envia respostas, nunca faz entregas e nunca altera nada no portal.
 
@@ -9,15 +9,15 @@ Aplicativo desktop para Windows que entra no portal do aluno Unilavras, abre a *
 ## 1. Requisitos
 
 - Windows 10 ou 11
-- **Google Chrome** instalado (o aplicativo usa o Chrome do computador)
+- Um navegador instalado: o aplicativo usa o primeiro que encontrar, nesta ordem: **Google Chrome**, **Safari** (só no macOS, pelo motor WebKit), **Mozilla Firefox** e **Microsoft Edge** (que já vem com o Windows). O Firefox é controlado por um modo ainda experimental do Playwright
 - Para rodar pelo código-fonte: **Python 3.12 ou superior** (testado com 3.14.7)
 
 ## 2. Usar o executável (sem instalar Python)
 
-1. Dê dois cliques em **`UniKanban.exe`**, na raiz do projeto, ao lado do `main.py`.
-2. O `UniKanban.exe` precisa da pasta **`_internal`** ao lado dele, porque é lá que ficam as bibliotecas. Para usar o app em outro lugar (ex.: `C:\Programas\UniKanban`), copie os **dois** juntos: `UniKanban.exe` e `_internal\`.
-3. (Opcional) Verifique se o Chrome e a automação estão funcionando:
-   `UniKanban.exe --diagnostico` (código de saída 0 = tudo certo).
+1. Dê dois cliques em **`UniSpace.exe`**, na raiz do projeto, ao lado do `main.py`.
+2. O `UniSpace.exe` precisa da pasta **`_internal`** ao lado dele, porque é lá que ficam as bibliotecas. Para usar o app em outro lugar (ex.: `C:\Programas\UniSpace`), copie os **dois** juntos: `UniSpace.exe` e `_internal\`.
+3. (Opcional) Verifique se o navegador e a automação estão funcionando:
+   `UniSpace.exe --diagnostico` (código de saída 0 = tudo certo).
 
 ## 3. Instalar e executar pelo código-fonte
 
@@ -29,7 +29,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe main.py
 ```
 
-Não é preciso rodar `playwright install`: o aplicativo usa o Google Chrome já instalado.
+Não é preciso rodar `playwright install`: o aplicativo usa o navegador já instalado (Chrome, Firefox ou Edge).
 
 ## 4. Configurar as credenciais
 
@@ -40,11 +40,11 @@ Não é preciso rodar `playwright install`: o aplicativo usa o Google Chrome já
 
 Para trocar o usuário ou a senha, edite os campos e salve de novo. **Remover credenciais** apaga os dados do cofre.
 
-**Segurança:** a senha fica no **Gerenciador de Credenciais do Windows** (Painel de Controle › Gerenciador de Credenciais › Credenciais do Windows › `UniKanban/novoportal.unilavras.edu.br`). Ela nunca é gravada no banco de dados, em arquivos de configuração ou nos registros (logs). Os logs passam por um filtro que remove senhas, tokens e cookies.
+**Segurança:** a senha fica no **Gerenciador de Credenciais do Windows** (Painel de Controle › Gerenciador de Credenciais › Credenciais do Windows › `UniSpace/novoportal.unilavras.edu.br`). Ela nunca é gravada no banco de dados, em arquivos de configuração ou nos registros (logs). Os logs passam por um filtro que remove senhas, tokens e cookies.
 
 ### Autenticação manual (CAPTCHA, verificação em duas etapas, Microsoft 365)
 
-Por padrão, a janela do Chrome fica **visível** durante a atualização (opção em Configurações › Navegador). Se o portal pedir CAPTCHA, verificação em duas etapas ou login Microsoft 365, o aplicativo mostra o aviso *"Conclua a autenticação na janela do Chrome"*. Conclua a etapa no navegador e a automação continua sozinha. O tempo limite é de 5 minutos.
+Por padrão, a janela do navegador fica **visível** durante a atualização (opção em Configurações › Navegador). Se o portal pedir CAPTCHA, verificação em duas etapas ou login Microsoft 365, o aplicativo mostra o aviso *"Conclua a autenticação na janela do Chrome"*. Conclua a etapa no navegador e a automação continua sozinha. O tempo limite é de 5 minutos.
 
 O aplicativo nunca tenta contornar esses mecanismos. Se a opção "navegador oculto" estiver ativa e o portal pedir verificação, você verá uma mensagem pedindo para reativar a janela visível.
 
@@ -52,7 +52,7 @@ O aplicativo nunca tenta contornar esses mecanismos. Se a opção "navegador ocu
 
 O login do portal é protegido pelo Cloudflare Turnstile, que fica invisível na maior parte do tempo. Depois de **várias tentativas de login seguidas**, o portal passa a exigir uma verificação humana e mostra *"Conclua a verificação de segurança antes de continuar"*. No Chrome controlado pela automação essa verificação **não pode ser concluída** (o portal exibe *"Não foi possível concluir a verificação neste navegador"*).
 
-Nesse caso, o UniKanban **não** diz que a senha está errada. Ele explica o que aconteceu e o que fazer:
+Nesse caso, o UniSpace **não** diz que a senha está errada. Ele explica o que aconteceu e o que fazer:
 
 1. Em Configurações, clique em **Abrir portal no navegador** (abre o seu navegador habitual).
 2. Entre normalmente no portal e conclua a verificação.
@@ -67,25 +67,30 @@ O portal guarda a sessão em `sessionStorage`, que é apagado quando o navegador
 | Tela | O que faz |
 |---|---|
 | **Início** | Saudação e resumo em uma frase ("2 entregas vencem nas próximas 48 horas"). Quatro indicadores clicáveis (*Vencem em até 48 h*, *A fazer*, *Em andamento*, *Concluídas*) abrem o quadro já filtrado. **Próximas entregas** agrupadas em *Atrasadas, Hoje, Amanhã, Esta semana, Mais adiante, Sem prazo*, com o ○ para concluir em um clique |
-| **Quadro** | Colunas *A fazer*, *Em andamento* e *Concluído*. Cada cartão mostra a cor e o nome curto da disciplina (sem o código), o prazo em linguagem natural ("Amanhã, 23:30 · faltam 31 h") e os pontos. **Clique no cartão** para abrir o painel lateral, **arraste** para mover ou reordenar, **○** conclui e o botão direito abre o menu (abrir no portal, mover, excluir) |
+| **Quadro de Atividades** | Colunas *A fazer*, *Em andamento* e *Concluído*. Cada cartão mostra a cor e o nome curto da disciplina (sem o código), o prazo em linguagem natural ("Amanhã, 23:30 · faltam 31 h") e os pontos. **Clique no cartão** para abrir o painel lateral, **arraste** para mover ou reordenar, **○** conclui e o botão direito abre o menu (abrir no portal, mover, excluir) |
 | **Painel da atividade** | Abre ao lado do quadro: edite nome, status, disciplina, prazo, pontuação e observações, resolva divergências com o portal ("Manter o meu" / "Usar do portal"), abra no portal ou exclua. Avisa antes de descartar alterações não salvas |
 | **Filtros** | Busca por nome ou disciplina, chips coloridos por disciplina, **Só urgentes**, **Ocultar concluídas**, ordenação (prazo, ordem manual, nome), alternância **quadro/lista** e **Excluídas** (para restaurar) |
-| **Atualizar agora** | Fica sempre visível na barra lateral. Roda em segundo plano, com uma barra discreta "Carregando dados do portal…" (etapa, disciplina, progresso e **Interromper**). Ao terminar, uma notificação resume o que mudou e leva ao resumo completo. Erros aparecem em uma faixa com a ação certa (ex.: **Abrir portal no navegador**, **Revisar conta**) |
+| **Atualizar agora** | Na tela inicial e sempre visível na barra lateral. Atualiza **todas as seções** com um único login: atividades, notas/AVIN, encontros virtuais e eventos. Roda em segundo plano, com uma barra discreta (etapa, disciplina, progresso e **Interromper**). Ao terminar, uma notificação resume o que mudou e leva ao resumo completo. Erros aparecem em uma faixa com a ação certa (ex.: **Abrir portal no navegador**, **Revisar conta**) |
 | **Calendário** | No topo, um quadro por **matéria em andamento** com os **encontros virtuais** (ex.: "Toda terça-feira às 21:00 · Próximo: Amanhã às 21:00"); matérias concluídas (mesma regra de módulos da aba Notas) não aparecem. Abaixo, o **calendário mensal** (domingo a sábado) com cada atividade no dia do prazo (barra na cor da matéria, horário, riscada se concluída; clique para abrir o painel) e os encontros virtuais (fundo lilás), em ordem de horário. Navegue com ‹ › e **Hoje**. Quando um dia tem mais de 3 itens, clique em **+N mais** (ou no número do dia) para ver **todos** os itens daquele dia, em ordem de horário; clique em uma atividade para abri-la |
 | **Notas** | Todas as matérias (inclusive as concluídas), em **ordem cronológica pela data de início**, com o AVIN do módulo somado à nota de cada uma. Cada matéria aparece como um cartão com a caixa **Matéria concluída** (e a nota total) ou **Em andamento** (e a nota atual). Clique no cartão para expandir as notas de cada atividade, separadas por categoria: data de envio, situação (*Corrigida*, *Aguardando correção*, *Não entregue*, *Pendente*) e nota obtida / quanto vale. O botão **Atualizar notas** roda **somente** a leitura de notas, sem mexer no quadro |
-| **Configurações** | Conta do portal (status da conexão, salvar, testar, abrir portal), opção de mostrar o Chrome, exportar para Excel/CSV, backup/restauração e, recolhido em **Avançado**, os nomes das opções do portal e as pastas de dados e logs |
+| **Eventos** | Os próximos eventos da Unilavras (os mesmos de **Portal › Eventos › Inscrição**, em `eventos.unilavras.edu.br`): data, horário, local e descrição, com filtros (*Todos*, *Próximos 7 dias*, *Próximos 30 dias*) e busca. **Saiba mais e inscrição** abre a página do evento; **Adicionar à agenda** cria um compromisso na aba Agenda. A página de eventos é pública: **Atualizar eventos** não precisa de login nem abre o Chrome. Eventos vistos pela primeira vez há até 3 dias levam o selo *Novo* |
+| **Agenda** | Seus compromissos (aulas, provas, estudos, trabalhos, eventos, pessoais), com data, horário de início/término ou dia inteiro, local, categoria e anotações. Lista agrupada por dia com filtros *Próximos*, *Concluídos* e *Todos*; conclua (com **Desfazer**), edite ou exclua. **Provas** (ex.: "Prova I: 12/11") e o **AVIN** aparecem sempre, na categoria **Prova**: as provas vêm da Sala de Aula Virtual e não entram no quadro de atividades; a data do AVIN é lida do **Planograma** de cada matéria do módulo atual (*Informações sobre a disciplina › Planograma*) e matérias com a mesma data viram um só compromisso. A opção **Mostrar entregas, encontros virtuais e eventos** junta, sem duplicar, os prazos do quadro, os encontros virtuais e os eventos dos próximos 60 dias. Os compromissos, as provas e o AVIN também aparecem no **Calendário** |
+| **Sobre** | Para que serve o aplicativo, o que cada aba faz e quem o criou (Marcelo Machado · marcelomachadoit@gmail.com) |
+| **Modo noturno** | Chave na barra lateral, logo acima do cartão de atualização. Troca todo o aplicativo para o tema escuro (e de volta) na hora, mantendo a aba aberta. A escolha fica salva |
+| **Configurações** | Conta do portal (status da conexão, salvar, testar, abrir portal), opção de mostrar o navegador, exportar para Excel/CSV, backup/restauração e, recolhido em **Avançado**, os nomes das opções do portal e as pastas de dados e logs |
 
 Ações rápidas, como concluir, mover ou excluir, mostram uma notificação com **Desfazer**.
 
-**Atalhos:** `F5` atualizar (na aba Notas, atualiza as notas) · `Ctrl+N` nova atividade · `Ctrl+F` buscar · `Esc` fechar o painel · `Ctrl+1…5` Início, Quadro, Calendário, Notas, Configurações.
+**Atalhos:** `F5` atualizar tudo (na aba Notas, só as notas; na aba Eventos, só os eventos) · `Ctrl+N` nova atividade (na aba Agenda, novo compromisso) · `Ctrl+F` buscar · `Esc` fechar o painel · `Ctrl+1…8` Início, Quadro de Atividades, Calendário, Notas, Eventos, Agenda, Sobre, Configurações.
 
 ### Atualização semanal automática
 
-Toda semana o aplicativo atualiza **tudo sozinho** (atividades, notas, AVIN e encontros virtuais) na **primeira vez que for aberto a partir de segunda-feira**. Se você não abrir o app na segunda, a atualização acontece no primeiro dia em que abrir naquela semana (ex.: na quarta). Depois disso, só na semana seguinte. Enquanto ela roda, aparece o cartão **"Atualização de dados semanal em andamento"** no canto da tela (com a etapa atual e o botão para interromper), e você pode continuar usando o app.
+Toda semana o aplicativo atualiza **tudo sozinho** (atividades, notas, AVIN, encontros virtuais e eventos) na **primeira vez que for aberto a partir de segunda-feira**. Se você não abrir o app na segunda, a atualização acontece no primeiro dia em que abrir naquela semana (ex.: na quarta). Depois disso, só na semana seguinte. Enquanto ela roda, aparece o cartão **"Atualização de dados semanal em andamento"** no canto da tela (com a etapa atual e o botão para interromper), e você pode continuar usando o app.
 
 - Tudo é feito em **uma única sessão de login**, para não acumular tentativas no portal.
 - Se a atualização falhar (sem internet, verificação de segurança), ela é tentada de novo em **outro dia** daquela semana, nunca várias vezes no mesmo dia.
 - Só roda se houver uma conta salva em Configurações.
+- Um **Atualizar agora** concluído com sucesso já vale como a atualização da semana.
 
 ### De onde vêm os encontros virtuais
 
@@ -115,18 +120,20 @@ Os indicadores de prazo combinam cor, ícone e texto, para não depender só da 
 
 ## 7. Onde ficam os dados
 
-`%LOCALAPPDATA%\UniKanban\`
+`%LOCALAPPDATA%\UniSpace\`
 
-- `unikanban.db`: banco SQLite (modo WAL, resistente a fechamentos inesperados), criado automaticamente na primeira execução
-- `logs\unikanban.log`: registros rotativos, sem dados sensíveis
-- `chrome-profile\`: perfil do Chrome usado pela automação (mantém o login entre atualizações)
+- `unispace.db`: banco SQLite (modo WAL, resistente a fechamentos inesperados), criado automaticamente na primeira execução. Guarda também os eventos lidos, os compromissos da agenda e a preferência de tema
+- `logs\unispace.log`: registros rotativos, sem dados sensíveis
+- `chrome-profile\`: perfil do Chrome usado pela automação (mantém o login entre atualizações); com outro navegador, `browser-profile-firefox\`, `browser-profile-edge\` ou `browser-profile-safari\`
 - `diagnostico\`: capturas de tela salvas quando uma disciplina falha
+
+**Vindo do UniKanban (nome antigo)?** Na primeira abertura, o UniSpace move a pasta `%LOCALAPPDATA%\UniKanban` para `%LOCALAPPDATA%\UniSpace` (renomeando `unikanban.db` para `unispace.db`) e passa a conta salva no Gerenciador de Credenciais de `UniKanban/novoportal.unilavras.edu.br` para `UniSpace/novoportal.unilavras.edu.br`. Nada é perdido e nada precisa ser feito à mão.
 
 Os backups (**Configurações › Fazer backup**) são cópias consistentes do banco. Ao restaurar, o aplicativo valida o arquivo e guarda uma cópia dos dados atuais antes de substituí-los.
 
 ## 8. Gerar o executável
 
-Feche o UniKanban e rode:
+Feche o UniSpace e rode:
 
 ```powershell
 .\.venv\Scripts\python.exe build_exe.py
@@ -134,14 +141,14 @@ Feche o UniKanban e rode:
 
 O script:
 
-1. roda o PyInstaller (`UniKanban.spec`);
-2. coloca **`UniKanban.exe`** e a pasta **`_internal`** na raiz do projeto, substituindo a versão anterior;
+1. roda o PyInstaller (`UniSpace.spec`);
+2. coloca **`UniSpace.exe`** e a pasta **`_internal`** na raiz do projeto, substituindo a versão anterior;
 3. apaga os arquivos temporários (`build/`);
-4. executa o autodiagnóstico do `.exe` (abre o Chrome em segundo plano e confere a tela de login do portal).
+4. executa o autodiagnóstico do `.exe` (abre o navegador em segundo plano e confere a tela de login do portal).
 
-O total fica em cerca de 270 MB. Seus dados ficam em `%LOCALAPPDATA%\UniKanban` e não são afetados.
+O total fica em cerca de 270 MB. Seus dados ficam em `%LOCALAPPDATA%\UniSpace` e não são afetados.
 
-**Pacote para envio:** `build_exe.py --zip` gera também o **`UniKanban.zip`** (~106 MB) na raiz. Ele contém a pasta `UniKanban/` com `UniKanban.exe`, `_internal/` e um `LEIA-ME.txt` de instruções para quem baixar. Para empacotar o executável atual sem gerá-lo de novo, use `build_exe.py --zip-only`. O zip não leva nenhum dado pessoal, porque senha, atividades e notas ficam no computador de cada um. Para recriar o ícone: `.\.venv\Scripts\python.exe assets\make_icon.py`.
+**Pacote para envio:** `build_exe.py --zip` gera também o **`UniSpace.zip`** (~106 MB) na raiz. Ele contém a pasta `UniSpace/` com `UniSpace.exe`, `_internal/` e um `LEIA-ME.txt` de instruções para quem baixar. Para empacotar o executável atual sem gerá-lo de novo, use `build_exe.py --zip-only`. O zip não leva nenhum dado pessoal, porque senha, atividades e notas ficam no computador de cada um. Para recriar o ícone: `.\.venv\Scripts\python.exe assets\make_icon.py`.
 
 ## 9. Testes
 
@@ -150,10 +157,10 @@ O total fica em cerca de 270 MB. Seus dados ficam em `%LOCALAPPDATA%\UniKanban` 
 .\.venv\Scripts\python.exe -m pytest -q
 
 # Integração com o portal real (opcional; credenciais só em variáveis de ambiente da sessão)
-$env:UNIKANBAN_TEST_USER = "seu_usuario"
-$env:UNIKANBAN_TEST_PASSWORD = "sua_senha"
+$env:UNISPACE_TEST_USER = "seu_usuario"
+$env:UNISPACE_TEST_PASSWORD = "sua_senha"
 .\.venv\Scripts\python.exe -m pytest tests\test_integration_portal.py -v -s
-Remove-Item Env:UNIKANBAN_TEST_USER, Env:UNIKANBAN_TEST_PASSWORD
+Remove-Item Env:UNISPACE_TEST_USER, Env:UNISPACE_TEST_PASSWORD
 ```
 
 | Arquivo | Cobre (itens da especificação) |
@@ -161,25 +168,30 @@ Remove-Item Env:UNIKANBAN_TEST_USER, Env:UNIKANBAN_TEST_PASSWORD
 | `tests/test_rules.py` | 1, 2 seleção ≥/< 95% · 3, 4 prazos futuros e expirados · 5 sem prazo com pontuação · 6 campos "-" · 7 datas no fuso de São Paulo · 8 chave de duplicatas · pontuação total × obtida |
 | `tests/test_sync_db.py` | 8 duplicatas · 9 atualização incremental · 10 preservação de status e observações · 11 persistência após reinício · 12 divergências · 13 exportação CSV/Excel e backup |
 | `tests/test_updater.py` | Fluxo completo com cliente simulado · 14 falhas de conexão, novas tentativas, sessão expirada, cancelamento, mudança de estrutura e login recusado |
-| `tests/test_security_ui.py` | Cofre de credenciais, senha fora do banco, filtro de logs, Kanban (soltar cartão, busca, chips de disciplina, concluir com Desfazer), painel lateral (editar e criar), tela inicial e primeiro uso |
+| `tests/test_security_ui.py` | Cofre de credenciais, senha fora do banco, filtro de logs, quadro (soltar cartão, busca, chips de disciplina, concluir com Desfazer), painel lateral (editar e criar), tela inicial e primeiro uso |
 | `tests/test_grades.py` | Grade de Notas (nota obtida × valor, situação, concluída/em andamento), tabela e respostas do AVIN (acertos × 1,25), ordem cronológica e persistência, atualização só de notas com falhas parciais, e a aba Notas (cartões, menu expansível) |
 | `tests/test_calendar.py` | Encontros virtuais a partir dos títulos reais do portal, recorrência semanal e datas avulsas, próximo encontro, matérias concluídas ocultas, persistência, cores distintas por matéria e a aba Calendário |
-| `tests/test_weekly.py` | Regra semanal (segunda-feira, segunda pulada → quarta, uma vez por semana, nova tentativa só em outro dia), atualização semanal com um único login, cartão de notificação, e "+N mais" do calendário abrindo todos os itens do dia |
+| `tests/test_weekly.py` | Regra semanal (segunda-feira, segunda pulada → quarta, uma vez por semana, nova tentativa só em outro dia), atualização completa com um único login (inclui eventos), cartão de notificação, e "+N mais" do calendário abrindo todos os itens do dia |
+| `tests/test_events.py` | Lista pública de eventos e detalhes do even3 (título completo, horário, local), reaproveitamento de detalhes, eventos removidos, site fora do ar e a aba Eventos (filtros, adicionar à agenda sem duplicar) |
+| `tests/test_agenda_ui.py` | Agenda (banco, filtros, entregas junto, concluir com Desfazer, validação do diálogo, calendário), abas na ordem, Sobre, "Atualizar agora" completo, modo noturno (troca e bloqueio durante atualização) e migração do UniKanban |
+| `tests/test_planograma.py` | Provas fora do quadro e na agenda/calendário como Prova, leitura do Planograma (tópico, link do PDF, texto do PDF, data do AVIN sem a 2ª chamada), releitura só quando o documento muda, falha sem afetar a atualização e migração do banco |
 | `tests/test_ui_format.py` | Prazos em linguagem natural, níveis de urgência com texto, nomes curtos de disciplina, pontos, agrupamento e tempo relativo |
 | `tests/test_login_detection.py` | Resultado do login com páginas simuladas: senha errada × verificação de segurança × verificação pendente |
-| `tests/test_integration_portal.py` | Portal real: atualização completa, segunda execução sem duplicatas e teste de conexão. O teste de senha errada só roda com `UNIKANBAN_TEST_WRONG_PASSWORD=1`, porque tentativas falhas levam o portal a exigir verificação humana |
+| `tests/test_integration_portal.py` | Portal real: atualização completa, segunda execução sem duplicatas e teste de conexão. O teste de senha errada só roda com `UNISPACE_TEST_WRONG_PASSWORD=1`, porque tentativas falhas levam o portal a exigir verificação humana |
 
 ## 10. Arquitetura
 
 ```
-UniKanban.exe               aplicativo pronto para usar (gerado por build_exe.py)
+UniSpace.exe               aplicativo pronto para usar (gerado por build_exe.py)
 _internal/                  bibliotecas do executável (não editar; precisa ficar ao lado do .exe)
 build_exe.py                gera o executável e o coloca na raiz
-UniKanban.spec              configuração do PyInstaller
+UniSpace.spec              configuração do PyInstaller
 main.py                     inicialização, tema, tratamento global de erros, --diagnostico
-app/services/weekly.py      atualização semanal automática (uma sessão de login para tudo)
+app/services/weekly.py      atualização completa ("Atualizar agora" e semanal; um login para tudo)
+app/services/events.py      eventos da Unilavras (página pública; sem login e sem navegador)
+app/automation/events_parser.py  lista de eventos e detalhes do even3 (dados estruturados schema.org)
 app/automation/meetings_parser.py  encontros virtuais a partir do conteúdo das disciplinas
-app/models/                 atividades, notas/AVIN e disciplinas/encontros
+app/models/                 atividades, notas/AVIN, disciplinas/encontros, eventos e agenda
 app/config.py               caminhos, fuso, limites (tempos, tentativas) e regras (95%, 48 h)
 app/models/activity.py      Course, ScrapedActivity, Activity (valores do portal × do usuário)
 app/database/db.py          SQLite: esquema versionado, WAL, transações, lixeira, histórico
@@ -188,13 +200,15 @@ app/services/sync.py        mesclagem incremental, divergências, edições do u
 app/services/updater.py     orquestra login → sala virtual → disciplinas → atividades → banco
 app/services/credentials.py Gerenciador de Credenciais do Windows (keyring)
 app/services/logging_setup.py logs rotativos com remoção de segredos
-app/automation/portal.py    Playwright + Chrome: login, pausa manual, navegação, novas tentativas
+app/automation/browsers.py  escolha do navegador (Chrome > Safari > Firefox > Edge)
+app/automation/portal.py    Playwright + navegador: login, pausa manual, navegação, novas tentativas
 app/automation/parser.py    interpretação dos dados da Plataforma A (testável sem navegador)
 app/automation/grades_parser.py  Grade de Notas e respostas do AVIN (HTML), sem navegador
 app/services/grades_updater.py   atualização somente das notas (todas as matérias + AVIN)
 app/export/exporter.py      CSV, Excel, backup e restauração
-app/ui/                     PySide6: início, quadro (Kanban/lista), painel lateral, notificações, tema e
-                            ícones nativos, configurações, workers; format.py = textos em linguagem natural
+app/ui/                     PySide6: início, quadro de atividades (colunas/lista), calendário, notas, eventos,
+                            agenda, sobre, configurações, painel lateral, notificações, tema claro/noturno,
+                            ícones nativos e workers; format.py = textos em linguagem natural
 tests/                      pytest
 ```
 
@@ -205,12 +219,14 @@ tests/                      pytest
 3. O menu **Disciplinas** (`/plataforma/my-enrollments/courses`) lista as disciplinas com "NN% concluído". A página carrega esses dados de `api.plataforma.grupoa.education/.../academic/courses/me` (campos `id`, `name`, `progress`, `nextPage`).
 4. Cada disciplina (`/plataforma/course/{id}`) carrega uma árvore de tópicos (ciclos, seções e itens) em `.../content/academics-main/{id}/contents`. Os itens avaliativos têm `hasDeadline`/`deadlineAt` (exibido como "Prazo de envio 30/10/2026 - 23:59") e `hasGrade`/`grade.value` (exibido como "Vale 4 pontos").
 5. Página da atividade: `/plataforma/course/{id}/content/{itemId}`.
+6. **Eventos:** no portal, **Serviços › Eventos › Inscrição** abre `eventos.unilavras.edu.br`, uma página pública com um cartão por evento (título, "Data: dd/mm/aaaa" e o link **Saiba mais**, geralmente para o even3). A página de cada evento no even3 traz dados estruturados (schema.org `Event`) com título completo, início, local e descrição.
 
 A automação navega pela interface real, como um aluno faria, e lê os dados que as próprias páginas carregam, interceptados de forma passiva com `expect_response`. Os elementos são localizados por texto e papel acessível ("Sala de Aula Virtual", "Disciplinas", "Acessar"), e não por posição. Se os dados da lista de disciplinas não vierem, há uma leitura alternativa pela tela ("NN% concluído"). A interface roda em `QThread`, então não congela. Cada disciplina é gravada no banco assim que termina, e uma interrupção não perde o que já foi coletado.
 
 ## 11. Limitações conhecidas
 
-- **Seções bloqueadas por condições** (ex.: "Ciclo IV", "Prova I: 12/11", liberadas só depois de concluir etapas anteriores) não mostram seus itens até serem liberadas. O aplicativo inspeciona tudo o que está acessível. Quando o título de uma seção bloqueada indica uma avaliação com data (ex.: "Prova I: 12/11"), ela entra no quadro com essa data (o ano vem do início da disciplina) e pontuação "-".
+- **Seções bloqueadas por condições** (ex.: "Ciclo IV", "Prova I: 12/11", liberadas só depois de concluir etapas anteriores) não mostram seus itens até serem liberadas. O aplicativo inspeciona tudo o que está acessível. Quando o título de uma seção bloqueada indica uma avaliação com data (ex.: "Prova I: 12/11"), ela entra na **agenda** (categoria Prova) com essa data (o ano vem do início da disciplina), e não no quadro.
+- **Data do AVIN:** durante a atualização, o aplicativo abre o tópico *Planograma* de cada matéria em andamento, baixa o PDF e procura a linha "dd/mm/aaaa AVIN" do quadro *Fique ligado!* (a 2ª chamada é ignorada). O PDF só é lido de novo quando o professor troca o documento. Se não houver Planograma ou a data estiver "a definir", o AVIN não aparece na agenda.
 - Unidades de conteúdo da editora (ex.: "Desafio" e "Exercícios" dentro de uma unidade SAGAH) não informam prazo nem pontuação no portal e, por isso, não entram.
 - Paginação da lista de disciplinas: o caso com mais de 20 disciplinas (`nextPage`) está implementado, mas não pôde ser testado na conta real, que tem 6 disciplinas.
 - O login via **Microsoft 365** e as verificações humanas foram implementados como pausa para ação manual, mas não puderam ser testados porque a conta de teste entra com usuário e senha sem verificação adicional.

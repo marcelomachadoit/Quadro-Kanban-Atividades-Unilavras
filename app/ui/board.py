@@ -1,4 +1,4 @@
-"""Quadro Kanban (arrastar e soltar) e lista, com busca, filtros por disciplina e ordenação."""
+"""Quadro de Atividades (arrastar e soltar) e lista, com busca, filtros por disciplina e ordenação."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -19,7 +19,7 @@ from app.ui.icons import icon
 from app.ui.theme import COLORS, STATUS_COLORS, URGENCY_STYLE
 from app.ui.widgets import Dot, EmptyState, Pill, button, clear_layout, icon_button, icon_label, label
 
-MIME = "application/x-unikanban-activity"
+MIME = "application/x-unispace-activity"
 SORT_DUE, SORT_MANUAL, SORT_NAME = "due", "manual", "name"
 
 
@@ -281,7 +281,7 @@ class BoardPage(QWidget):
         head.setSpacing(10)
         tv = QVBoxLayout()
         tv.setSpacing(0)
-        tv.addWidget(label("Quadro", "H1"))
+        tv.addWidget(label("Quadro de Atividades", "H1"))
         self.subtitle = label("", "Muted")
         tv.addWidget(self.subtitle)
         head.addLayout(tv)
@@ -472,7 +472,7 @@ class BoardPage(QWidget):
 
     # ------------------------------------------------------------------ renderização
     def refresh(self, *_):
-        all_acts = self.ctx.db.list_activities()
+        all_acts = [a for a in self.ctx.db.list_activities() if not a.is_exam]     # provas ficam na agenda
         now = datetime.now(TZ)
         self._refresh_chips(all_acts)
         acts = self._filtered(all_acts, now)

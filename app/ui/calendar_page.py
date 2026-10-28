@@ -1,4 +1,4 @@
-"""Aba Calendário: encontros virtuais das matérias ativas e calendário mensal com as atividades."""
+"""Aba Calendário: encontros virtuais das matérias ativas e calendário mensal com atividades e compromissos."""
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -10,8 +10,8 @@ from PySide6.QtWidgets import (QDialog, QFrame, QGridLayout, QHBoxLayout, QPushB
 
 from app.config import TZ
 from app.models.activity import STATUS_DONE, Activity
-from app.models.meetings import CourseInfo, completed_ids, next_meeting, occurrences
-from app.ui.format import course_color, short_course
+from app.models.meetings import CourseInfo, avin_days, completed_ids, next_meeting, occurrences
+from app.ui.format import category_color, course_color, short_course
 from app.ui.theme import COLORS
 from app.ui.widgets import Dot, button, clear_layout, icon_button, icon_label, label
 
@@ -20,7 +20,6 @@ MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "
           "novembro", "dezembro"]
 WEEK_HEAD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 WD_SHORT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-MEETING_COLOR = "#7C3AED"
 MAX_PER_DAY = 3
 DAY_MIN_HEIGHT = 136      # número do dia + 3 itens + "+N mais"
 
@@ -66,7 +65,7 @@ class MeetingBox(QFrame):
         t = label(short_course(info.name), "H3", wrap=True)
         t.setToolTip(info.name)
         h.addWidget(t, 1)
-        h.addWidget(icon_label("calendar", MEETING_COLOR, 14))
+        h.addWidget(icon_label("calendar", COLORS["violet"], 14))
         v.addLayout(h)
         weekly = [m for m in info.meetings if m.kind == "weekly"]
         today = now.date()
@@ -82,7 +81,7 @@ class MeetingBox(QFrame):
         if nxt:
             d, m = nxt
             p = label(f"Próximo: <b>{_fmt_next(d, m.time, today)}</b>")
-            p.setStyleSheet(f"color:{MEETING_COLOR};")
+            p.setStyleSheet(f"color:{COLORS['violet']};")
             v.addWidget(p)
 
 
@@ -93,7 +92,7 @@ class DayCell(QFrame):
         super().__init__()
         self.day = day
         self.setObjectName("DayCell")
-        bg = "white" if in_month else COLORS["surface_alt"]
+        bg = COLORS["surface"] if in_month else COLORS["surface_alt"]
         border = COLORS["primary"] if is_today else COLORS["border"]
         self.setStyleSheet(f"QFrame#DayCell {{ background:{bg}; border:1px solid {border}; border-radius:8px; }}")
         self.setMinimumHeight(DAY_MIN_HEIGHT)
@@ -106,7 +105,7 @@ class DayCell(QFrame):
         n.setToolTip("Ver tudo deste dia")
         n.clicked.connect(lambda: self.open_day.emit(self.day))
         if is_today:
-            n.setStyleSheet(f"QPushButton {{ background:{COLORS['primary']}; color:white; border:none; "
+            n.setStyleSheet(f"QPushButton {{ background:{COLORS['primary']}; color:{COLORS['on_primary']}; border:none; "
                             "border-radius:10px; padding:1px 7px; font-weight:700; }")
         else:
             n.setStyleSheet(f"QPushButton {{ background:transparent; border:none; padding:1px 4px; font-weight:600; "
@@ -140,7 +139,7 @@ class DayCell(QFrame):
 
 
 class DayDialog(QDialog):
-    """Todos os itens de um dia (atividades e encontros), em ordem de horário."""
+    """Todos os itens de um dia (atividades, encontros e compromissos da agenda), em ordem de horário."""
     open_activity = Signal(int)
 
     def __init__(self, day: date, items: list[dict], parent=None):
@@ -151,11 +150,13 @@ class DayDialog(QDialog):
         lay.setContentsMargins(22, 20, 22, 16)
         lay.setSpacing(8)
         lay.addWidget(label(f"{WEEKDAY_FULL[day.weekday()].capitalize()}, {day.day} de {MONTHS[day.month - 1]}", "H2"))
-        acts = sum(1 for i in items if not i["meeting"])
-        meets = len(items) - acts
+        acts = sum(1 for i in items if not i["meeting"] and i["aid"] is not None)
+        meets = sum(1 for i in items if i["meeting"])
+        own = len(items) - acts - meets
         lay.addWidget(label(" · ".join(x for x in (
             f"{acts} {'atividade' if acts == 1 else 'atividades'}" if acts else "",
-            f"{meets} {'encontro virtual' if meets == 1 else 'encontros virtuais'}" if meets else "") if x)
+            f"{meets} {'encontro virtual' if meets == 1 else 'encontros virtuais'}" if meets else "",
+            f"{own} {'compromisso' if own == 1 else 'compromissos'}" if own else "") if x)
             or "Nada neste dia.", "Muted"))
         for it in items:
             lay.addWidget(self._row(it))
@@ -167,8 +168,9 @@ class DayDialog(QDialog):
 
     def _row(self, it: dict) -> QWidget:
         w = QPushButton()
-        w.setCursor(Qt.ArrowCursor if it["meeting"] else Qt.PointingHandCursor)
-        bg = "#F3E8FF" if it["meeting"] else "white"
+        opens = not it["meeting"] and it["aid"] is not None
+        w.setCursor(Qt.PointingHandCursor if opens else Qt.ArrowCursor)
+        bg = COLORS["violet_bg"] if it["meeting"] else COLORS["surface"]
         w.setStyleSheet(f"QPushButton {{ text-align:left; background:{bg}; border:1px solid {COLORS['border']};"
                         f" border-left:4px solid {it['color']}; border-radius:8px; padding:0; }}"
                         f"QPushButton:hover {{ border-color:{COLORS['border_strong']}; }}")
@@ -185,12 +187,12 @@ class DayDialog(QDialog):
         v.addWidget(title)
         v.addWidget(label(it["subtitle"], "Small", wrap=True))
         h.addLayout(v, 1)
-        if not it["meeting"]:
+        if opens:
             h.addWidget(icon_label("chevron_right", COLORS["subtle"], 12))
             w.clicked.connect(lambda: (self.open_activity.emit(it["aid"]), self.accept()))
         w.setMinimumHeight(52)
         w.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        w.setToolTip("Abrir a atividade" if not it["meeting"] else it["subtitle"])
+        w.setToolTip("Abrir a atividade" if opens else it["subtitle"])
         return w
 
 
@@ -219,7 +221,8 @@ class CalendarPage(QWidget):
         tv = QVBoxLayout()
         tv.setSpacing(0)
         tv.addWidget(label("Calendário", "H1"))
-        tv.addWidget(label("Prazos das atividades e encontros virtuais das matérias em andamento.", "Muted"))
+        tv.addWidget(label("Prazos das atividades, encontros virtuais das matérias em andamento e compromissos da sua "
+                           "agenda.", "Muted"))
         head.addLayout(tv, 1)
         lay.addLayout(head)
 
@@ -238,7 +241,7 @@ class CalendarPage(QWidget):
         nav.addSpacing(8)
         nav.addWidget(button("Hoje", "", on_click=self.go_today))
         nav.addStretch(1)
-        legend = label(f"<span style='background:#F3E8FF;color:{MEETING_COLOR}'>&nbsp;■&nbsp;</span> Encontro "
+        legend = label(f"<span style='background:{COLORS['violet_bg']};color:{COLORS['violet']}'>&nbsp;■&nbsp;</span> Encontro "
                        f"virtual (fundo lilás) &nbsp;&nbsp; "
                        f"<span style='color:{COLORS['primary']}'>▌</span> Atividade · a barra tem a cor da matéria "
                        "&nbsp;&nbsp; "
@@ -260,6 +263,7 @@ class CalendarPage(QWidget):
         lay.addLayout(self.grid)
         lay.addStretch(1)
         ctx.data_changed.connect(self.refresh)
+        ctx.agenda_changed.connect(self.refresh)
         self.refresh()
 
     def open_day(self, d: date) -> None:
@@ -336,14 +340,41 @@ class CalendarPage(QWidget):
             dt = a.due_at
             date_only = (dt.hour, dt.minute, dt.second) == (23, 59, 59)
             hhmm = "" if date_only else f"{dt:%H:%M} "
-            tip = f"{a.name}\n{a.course}\nPrazo: {a.due_display} · {a.points}"
-            chip = self._chip(f"{hhmm}{a.name}", course_color(a.course), tip, done=a.status == STATUS_DONE)
+            color = category_color("Prova") if a.is_exam else course_color(a.course)
+            tip = (f"Prova — {a.name}\n{a.course}\nData: {a.due_display}" if a.is_exam else
+                   f"{a.name}\n{a.course}\nPrazo: {a.due_display} · {a.points}")
+            chip = self._chip(f"{hhmm}{a.name}", color, tip, done=a.status == STATUS_DONE)
             chip.clicked.connect(lambda _=False, aid=a.id: self.open_activity.emit(aid))
             per_day.setdefault(dt.date(), []).append(("23:59" if date_only else f"{dt:%H:%M}", 1, chip, tip))
             self.day_items.setdefault(dt.date(), []).append(dict(
                 sort=("23:59" if date_only else f"{dt:%H:%M}", 1), time=None if date_only else f"{dt:%H:%M}",
-                title=a.name, subtitle=f"{short_course(a.course)} · {a.points}" if a.points != "-" else short_course(a.course),
-                color=course_color(a.course), meeting=False, done=a.status == STATUS_DONE, aid=a.id))
+                title=a.name, subtitle=(f"Prova · {short_course(a.course)}" if a.is_exam else
+                                        f"{short_course(a.course)} · {a.points}" if a.points != "-" else
+                                        short_course(a.course)),
+                color=color, meeting=False, done=a.status == STATUS_DONE, aid=a.id))
+        for d, courses in avin_days(active, first, last).items():
+            if d not in cells:
+                continue
+            tip = "AVIN — avaliação integrada do módulo\n" + "\n".join(courses)
+            chip = self._chip("AVIN", category_color("Prova"), tip, meeting=True, agenda=True)
+            chip.clicked.connect(lambda _=False, day=d: self.open_day(day))
+            per_day.setdefault(d, []).append(("00:00", 1, chip, tip))
+            self.day_items.setdefault(d, []).append(dict(
+                sort=("00:00", 1), time=None, title="AVIN", subtitle="Prova · " + ", ".join(map(short_course, courses)),
+                color=category_color("Prova"), meeting=False, done=False, aid=None))
+        for it in self.ctx.db.list_agenda_items():
+            d = it.date
+            if d not in cells:
+                continue
+            tip = "\n".join(x for x in (f"Agenda — {it.title}", f"{it.time_range()} · {it.category}", it.location) if x)
+            chip = self._chip(f"{it.start_time + ' ' if it.start_time else ''}{it.title}",
+                              category_color(it.category), tip, meeting=True, done=it.done, agenda=True)
+            chip.clicked.connect(lambda _=False, day=d: self.open_day(day))
+            per_day.setdefault(d, []).append((it.start_time or "00:00", 2, chip, tip))
+            self.day_items.setdefault(d, []).append(dict(
+                sort=(it.start_time or "00:00", 2), time=it.start_time, title=it.title,
+                subtitle=" · ".join(x for x in (f"Agenda · {it.category}", it.location) if x),
+                color=category_color(it.category), meeting=False, done=it.done, aid=None))
         for d, items in per_day.items():
             for _t, _o, chip, tip in sorted(items, key=lambda x: (x[0], x[1])):
                 cells[d].add_chip(chip, tip)
@@ -351,12 +382,13 @@ class CalendarPage(QWidget):
             c.finish()
 
     @staticmethod
-    def _chip(text: str, color: str, tip: str, meeting: bool = False, done: bool = False) -> "ElidedButton":
+    def _chip(text: str, color: str, tip: str, meeting: bool = False, done: bool = False,
+              agenda: bool = False) -> "ElidedButton":
         b = ElidedButton(text)
         b.setToolTip(tip)
         b.setCursor(Qt.ArrowCursor if meeting else Qt.PointingHandCursor)
-        bg = "#F3E8FF" if meeting else "white"
-        deco = "text-decoration: line-through; color:#94A3B8;" if done else f"color:{COLORS['text_2']};"
+        bg = COLORS["violet_bg"] if meeting and not agenda else COLORS["surface"]
+        deco = f"text-decoration: line-through; color:{COLORS['subtle']};" if done else f"color:{COLORS['text_2']};"
         b.setStyleSheet(f"QPushButton {{ text-align:left; padding:2px 6px; border:none; border-left:3px solid {color};"
                         f" border-radius:4px; background:{bg}; font-size:8.5pt; {deco} }}"
                         f"QPushButton:hover {{ background:{COLORS['neutral_bg']}; }}")

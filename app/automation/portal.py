@@ -16,6 +16,8 @@ from urllib.parse import urlsplit
 from playwright.sync_api import Error as PWError
 from playwright.sync_api import Page, Response, TimeoutError as PWTimeout, sync_playwright
 
+from app.automation import browsers
+from app.automation.browsers import BrowserChoice
 from app.config import (ACTION_TIMEOUT_MS, MANUAL_AUTH_TIMEOUT_S, MAX_RETRIES, NAV_TIMEOUT_MS, POLITE_DELAY_MS,
                         PORTAL_LOGIN_URL)
 from app.models.activity import Course
@@ -26,6 +28,7 @@ log = logging.getLogger(__name__)
 
 COURSES_API = re.compile(r"/plataforma/academic/courses/me\?")
 CONTENTS_API = re.compile(r"/plataforma/content/academics-main/(\d+)/contents")
+TOPIC_API = re.compile(r"/plataforma/content/academics-main/(\d+)/topics/(\d+)(?:\?|$)")
 GRADES_API = re.compile(r"/plataforma/grades/courses/(\d+)/me")
 AVIN_TABLE = re.compile(r"/ResultadoAluno/Tabela/?\?", re.I)
 AVIN_ANSWERS = re.compile(r"/ResultadoAluno/FormularioRespostas\?idAlunoAvaliacao=(\d+)", re.I)
@@ -100,6 +103,7 @@ class PortalClient:
         self.on_manual = on_manual or (lambda s: None)
         self._pw = None
         self._ctx = None
+        self.browser: Optional[BrowserChoice] = None      # navegador escolhido ao iniciar
         self.portal: Optional[Page] = None
         self.lxp: Optional[Page] = None
         self.lxp_base: str = ""
@@ -116,20 +120,21 @@ class PortalClient:
         self.close()
 
     def start(self) -> None:
-        self.profile_dir.mkdir(parents=True, exist_ok=True)
         self._pw = sync_playwright().start()
+
+        def open_with(choice: BrowserChoice):
+            profile = browsers.profile_dir(self.profile_dir, choice)
+            profile.mkdir(parents=True, exist_ok=True)
+            return getattr(self._pw, choice.engine).launch_persistent_context(
+                str(profile), headless=self.headless, locale="pt-BR", timezone_id="America/Sao_Paulo",
+                viewport={"width": 1366, "height": 860}, **choice.launch_args)
+
         try:
-            self._ctx = self._pw.chromium.launch_persistent_context(
-                str(self.profile_dir), channel="chrome", headless=self.headless,
-                locale="pt-BR", timezone_id="America/Sao_Paulo", viewport={"width": 1366, "height": 860},
-                args=["--disable-features=Translate"],
-            )
-        except PWError as e:
+            self._ctx, self.browser = browsers.first_available(open_with)
+        except LookupError as e:
             self._pw.stop()
             self._pw = None
-            raise BrowserUnavailable(
-                "Não foi possível iniciar o Google Chrome. Verifique se ele está instalado e fechado em outras "
-                "automações. Detalhe técnico: " + str(e).splitlines()[0]) from e
+            raise BrowserUnavailable(f"{browsers.NONE_FOUND} Detalhe técnico: {e}") from e
         self._ctx.set_default_timeout(ACTION_TIMEOUT_MS)
         self._ctx.set_default_navigation_timeout(NAV_TIMEOUT_MS)
         self.portal = self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
@@ -213,7 +218,7 @@ class PortalClient:
                               "corretos, o portal pode estar exigindo verificação por excesso de tentativas: entre "
                               "uma vez pelo seu navegador habitual e tente novamente em alguns minutos.")
         # verificação interativa, 2FA ou Microsoft 365 — pausa para ação humana
-        self._await_manual("Conclua a verificação na janela do Chrome (CAPTCHA, verificação em duas etapas "
+        self._await_manual("Conclua a verificação na janela do navegador (CAPTCHA, verificação em duas etapas "
                            "ou Microsoft 365). A atualização continuará automaticamente.")
 
     def _wait_logged_in(self, p: Page, seconds: int) -> bool:
@@ -267,7 +272,7 @@ class PortalClient:
         if self.headless:
             raise HumanVerificationRequired(
                 "O portal pediu uma verificação manual (CAPTCHA ou verificação em duas etapas). Ative a opção "
-                "\"Mostrar a janela do Chrome durante a atualização\" em Configurações e tente novamente.")
+                "\"Mostrar a janela do navegador durante a atualização\" em Configurações e tente novamente.")
         self.on_manual(msg)
         log.info("Aguardando autenticação manual do usuário no navegador.")
         if not self._wait_logged_in(self.portal, MANUAL_AUTH_TIMEOUT_S):
@@ -378,6 +383,37 @@ class PortalClient:
         data = self._retry(f"Abrir a disciplina {course.name}", go)
         self._wait(lx, POLITE_DELAY_MS)
         return data
+
+    def course_topic(self, course: Course, topic_id) -> dict:
+        """Abre a página de um tópico da disciplina (ex.: Planograma) e retorna os dados que ela carrega."""
+        self.check_cancel()
+        lx = self.lxp
+        cid, tid = str(course.source_id), str(topic_id)
+
+        def match(r) -> bool:
+            m = TOPIC_API.search(r.url)
+            return bool(m) and m.groups() == (cid, tid) and r.request.method == "GET"
+
+        def go():
+            with lx.expect_response(match, timeout=NAV_TIMEOUT_MS) as resp:
+                lx.goto(f"{self.lxp_base}/plataforma/course/{cid}/content/{tid}", wait_until="domcontentloaded")
+            return self._json(resp.value)
+
+        data = self._retry(f"Abrir o tópico {tid} de {course.name}", go)
+        self._wait(lx, POLITE_DELAY_MS)
+        return data
+
+    def download(self, url: str) -> bytes:
+        """Baixa um arquivo exibido pela plataforma (ex.: PDF do Planograma), com a sessão do navegador."""
+        self.check_cancel()
+
+        def go():
+            r = self.lxp.request.get(url, timeout=NAV_TIMEOUT_MS)
+            if r.status >= 400:
+                raise AutomationError(f"O arquivo respondeu com erro {r.status}.")
+            return r.body()
+
+        return self._retry("Baixar arquivo da disciplina", go)
 
     # ---------------------------------------------------------------- notas da disciplina
     def course_grades(self, course: Course) -> dict:

@@ -1,4 +1,4 @@
-"""Persistência SQLite: criação do esquema, CRUD de atividades e metadados."""
+"""Persistência SQLite: criação do esquema, CRUD de atividades, agenda, eventos e metadados."""
 from __future__ import annotations
 
 import json
@@ -12,10 +12,12 @@ from typing import Iterable, Optional
 
 from app.config import TZ
 from app.models.activity import Activity, SEEN_MANUAL, STATUS_TODO, STATUSES, dt_to_iso
+from app.models.agenda import AgendaItem
+from app.models.events import PortalEvent
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS activities (
@@ -69,8 +71,39 @@ CREATE TABLE IF NOT EXISTS course_info (
     start_date TEXT,
     progress   REAL,
     meetings   TEXT,                      -- JSON; NULL = ainda não lido
-    updated_at TEXT
+    updated_at TEXT,
+    avin_date  TEXT,                      -- AAAA-MM-DD, lida do Planograma da disciplina
+    planograma_rev TEXT                   -- versão do tópico Planograma já lida (evita baixar o PDF de novo)
 );
+
+CREATE TABLE IF NOT EXISTS portal_events (
+    key         TEXT PRIMARY KEY,
+    title       TEXT NOT NULL,
+    date        TEXT NOT NULL,            -- AAAA-MM-DD
+    url         TEXT,
+    start_at    TEXT,
+    end_at      TEXT,
+    location    TEXT,
+    description TEXT,
+    first_seen  TEXT,
+    updated_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS agenda_items (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,
+    day         TEXT NOT NULL,            -- AAAA-MM-DD
+    start_time  TEXT,                     -- HH:MM; NULL = dia inteiro
+    end_time    TEXT,
+    location    TEXT NOT NULL DEFAULT '',
+    category    TEXT NOT NULL DEFAULT 'Outro',
+    notes       TEXT NOT NULL DEFAULT '',
+    done        INTEGER NOT NULL DEFAULT 0,
+    source_key  TEXT,                     -- "evento:<chave>" quando criado a partir da aba Eventos
+    created_at  TEXT,
+    updated_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_agenda_day ON agenda_items(day);
 
 CREATE TABLE IF NOT EXISTS sync_runs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,11 +152,14 @@ class Database:
             ver = self.conn.execute("PRAGMA user_version").fetchone()[0]
             self.conn.executescript(SCHEMA)
             # migração aditiva (também cobre backups antigos restaurados): só acrescenta colunas novas
-            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(activities)")}
-            for name, ddl in (("portal_completed", "INTEGER NOT NULL DEFAULT 0"), ("portal_submitted_at", "TEXT")):
-                if name not in cols:
-                    self.conn.execute(f"ALTER TABLE activities ADD COLUMN {name} {ddl}")
-                    log.info("Banco atualizado: coluna %s adicionada", name)
+            for table, new_cols in (
+                    ("activities", (("portal_completed", "INTEGER NOT NULL DEFAULT 0"), ("portal_submitted_at", "TEXT"))),
+                    ("course_info", (("avin_date", "TEXT"), ("planograma_rev", "TEXT")))):
+                cols = {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+                for name, ddl in new_cols:
+                    if name not in cols:
+                        self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+                        log.info("Banco atualizado: coluna %s.%s adicionada", table, name)
             if ver < SCHEMA_VERSION:
                 self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             ok = self.conn.execute("PRAGMA quick_check").fetchone()[0]
@@ -319,8 +355,88 @@ class Database:
             except ValueError:
                 meetings = []
             out.append({"course_id": r["course_id"], "name": r["name"], "start_date": r["start_date"],
-                        "progress": r["progress"], "meetings": meetings})
+                        "progress": r["progress"], "meetings": meetings, "avin_date": r["avin_date"],
+                        "planograma_rev": r["planograma_rev"]})
         return out
+
+    def save_course_avin(self, course_id: str, avin_date: Optional[str], planograma_rev: Optional[str]) -> None:
+        """Data do AVIN lida do Planograma (a disciplina já deve existir em course_info)."""
+        with self.transaction() as c:
+            c.execute("UPDATE course_info SET avin_date=?, planograma_rev=?, updated_at=? WHERE course_id=?",
+                      (avin_date, planograma_rev, now_iso(), str(course_id)))
+
+    # ------------------------------------------------------------ eventos da Unilavras
+    def replace_portal_events(self, events: Iterable[PortalEvent]) -> None:
+        """A lista lida substitui a anterior (eventos que saíram da página somem); ``first_seen`` é preservado."""
+        events = list(events)
+        ts = now_iso()
+        with self.transaction() as c:
+            keys = [e.key for e in events]
+            if keys:
+                c.execute(f"DELETE FROM portal_events WHERE key NOT IN ({','.join('?' * len(keys))})", keys)
+            else:
+                c.execute("DELETE FROM portal_events")
+            for e in events:
+                c.execute("INSERT INTO portal_events(key, title, date, url, start_at, end_at, location, description, "
+                          "first_seen, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET "
+                          "title=excluded.title, date=excluded.date, url=excluded.url, start_at=excluded.start_at, "
+                          "end_at=excluded.end_at, location=excluded.location, description=excluded.description, "
+                          "updated_at=excluded.updated_at",
+                          (e.key, e.title, e.date, e.url, e.start_at, e.end_at, e.location, e.description, ts, ts))
+
+    def list_portal_events(self, from_day: Optional[str] = None) -> list[PortalEvent]:
+        q = "SELECT * FROM portal_events"
+        args: tuple = ()
+        if from_day:
+            q += " WHERE date >= ?"
+            args = (from_day,)
+        q += " ORDER BY date, COALESCE(start_at, ''), title"
+        with self._lock:
+            rows = self.conn.execute(q, args).fetchall()
+        return [PortalEvent(key=r["key"], title=r["title"], date=r["date"], url=r["url"], start_at=r["start_at"],
+                            end_at=r["end_at"], location=r["location"], description=r["description"],
+                            first_seen=r["first_seen"]) for r in rows]
+
+    # ------------------------------------------------------------ agenda
+    _AGENDA_FIELDS = ("title", "day", "start_time", "end_time", "location", "category", "notes", "done", "source_key")
+
+    def add_agenda_item(self, item: AgendaItem) -> int:
+        ts = now_iso()
+        vals = [getattr(item, f) for f in self._AGENDA_FIELDS]
+        vals[self._AGENDA_FIELDS.index("done")] = int(item.done)
+        with self.transaction() as c:
+            cur = c.execute(f"INSERT INTO agenda_items({','.join(self._AGENDA_FIELDS)}, created_at, updated_at) "
+                            f"VALUES({','.join('?' * len(self._AGENDA_FIELDS))}, ?, ?)", vals + [ts, ts])
+        item.id = cur.lastrowid
+        return item.id
+
+    def update_agenda_item(self, item_id: int, **fields) -> None:
+        bad = set(fields) - set(self._AGENDA_FIELDS)
+        if bad:
+            raise ValueError(f"campos inválidos: {bad}")
+        if not fields:
+            return
+        if "done" in fields:
+            fields["done"] = int(bool(fields["done"]))
+        fields["updated_at"] = now_iso()
+        sets = ",".join(f"{k}=?" for k in fields)
+        with self.transaction() as c:
+            c.execute(f"UPDATE agenda_items SET {sets} WHERE id=?", list(fields.values()) + [item_id])
+
+    def delete_agenda_item(self, item_id: int) -> None:
+        with self.transaction() as c:
+            c.execute("DELETE FROM agenda_items WHERE id=?", (item_id,))
+
+    def list_agenda_items(self) -> list[AgendaItem]:
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM agenda_items ORDER BY day, COALESCE(start_time, ''), id").fetchall()
+        return [AgendaItem(id=r["id"], title=r["title"], day=r["day"], start_time=r["start_time"],
+                           end_time=r["end_time"], location=r["location"], category=r["category"], notes=r["notes"],
+                           done=bool(r["done"]), source_key=r["source_key"]) for r in rows]
+
+    def agenda_source_keys(self) -> set[str]:
+        with self._lock:
+            return {r[0] for r in self.conn.execute("SELECT source_key FROM agenda_items WHERE source_key IS NOT NULL")}
 
     # ------------------------------------------------------------ histórico de sincronização
     def start_run(self) -> int:

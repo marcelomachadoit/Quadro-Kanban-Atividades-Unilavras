@@ -1,12 +1,12 @@
-"""Gera o executável e o coloca na raiz do projeto: UniKanban.exe + pasta _internal (bibliotecas).
+"""Gera o executável e o coloca na raiz do projeto: UniSpace.exe + pasta _internal (bibliotecas).
 
 Uso:  .\\.venv\\Scripts\\python.exe build_exe.py            gera o executável
-      .\\.venv\\Scripts\\python.exe build_exe.py --zip      gera o executável e o UniKanban.zip para envio
-      .\\.venv\\Scripts\\python.exe build_exe.py --zip-only só cria o UniKanban.zip com o executável atual
+      .\\.venv\\Scripts\\python.exe build_exe.py --zip      gera o executável e o UniSpace.zip para envio
+      .\\.venv\\Scripts\\python.exe build_exe.py --zip-only só cria o UniSpace.zip com o executável atual
 
-Etapas: confere se o app está fechado, roda o PyInstaller (UniKanban.spec) numa pasta temporária, substitui o
-UniKanban.exe e a pasta _internal da raiz, apaga os arquivos temporários e executa o autodiagnóstico do .exe.
-Os dados do usuário (%LOCALAPPDATA%\\UniKanban) não são tocados.
+Etapas: confere se o app está fechado, roda o PyInstaller (UniSpace.spec) numa pasta temporária, substitui o
+UniSpace.exe e a pasta _internal da raiz, apaga os arquivos temporários e executa o autodiagnóstico do .exe.
+Os dados do usuário (%LOCALAPPDATA%\\UniSpace) não são tocados.
 """
 from __future__ import annotations
 
@@ -17,55 +17,59 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-EXE = ROOT / "UniKanban.exe"
+EXE = ROOT / "UniSpace.exe"
 INTERNAL = ROOT / "_internal"
 WORK = ROOT / "build"
 STAGE = WORK / "_dist"
-ZIP = ROOT / "UniKanban.zip"
+ZIP = ROOT / "UniSpace.zip"
 
-LEIA_ME = """UniKanban - Tarefas Unilavras
-==============================
+LEIA_ME = """UniSpace - Seu espaço na Unilavras
+=================================
 
-Organiza as atividades, prazos, notas e encontros virtuais da Sala de Aula Virtual Unilavras em um quadro
-Kanban. Funciona no seu computador: seus dados e sua senha ficam somente nele.
+Reúne em um só lugar as atividades e prazos da Sala de Aula Virtual Unilavras (em um quadro de atividades),
+notas e AVIN, encontros virtuais, os eventos da Unilavras e a sua agenda pessoal. Funciona no seu computador:
+seus dados e sua senha ficam somente nele.
 
 COMO USAR
 1. Extraia este arquivo .zip (clique com o botão direito > "Extrair tudo...").
    Não abra o programa de dentro do .zip.
-2. Abra a pasta "UniKanban" e dê dois cliques em UniKanban.exe.
+2. Abra a pasta "UniSpace" e dê dois cliques em UniSpace.exe.
 3. Na tela inicial, informe seu usuário e senha do portal do aluno e clique em
    "Conectar e buscar atividades".
 
 REQUISITOS
 - Windows 10 ou 11.
-- Google Chrome instalado (o aplicativo usa o Chrome em segundo plano para ler o portal).
+- Um navegador: o aplicativo usa, nesta ordem, o primeiro que encontrar entre Google Chrome, Mozilla Firefox e
+  Microsoft Edge (o Edge ja vem com o Windows) para ler o portal em segundo plano.
 
 AVISOS
 - Na primeira abertura, o Windows pode mostrar "O Windows protegeu o computador", porque o programa não tem
   assinatura digital. Clique em "Mais informações" e depois em "Executar assim mesmo".
-- Mantenha o UniKanban.exe sempre junto da pasta "_internal" (ela contém as bibliotecas do programa).
+- Mantenha o UniSpace.exe sempre junto da pasta "_internal" (ela contém as bibliotecas do programa).
 - Sua senha fica guardada no Gerenciador de Credenciais do Windows, nunca em arquivos. O aplicativo apenas lê o
   portal: nada é enviado ou alterado lá.
 - Toda semana, na primeira vez que você abrir o app a partir de segunda-feira, ele atualiza tudo sozinho.
+- Quem já usava o UniKanban (nome antigo) não perde nada: dados e conta são levados para o UniSpace na
+  primeira abertura.
 """
 
 
 def app_running() -> bool:
-    out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq UniKanban.exe", "/NH"], capture_output=True, text=True)
-    return "UniKanban.exe" in out.stdout
+    out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq UniSpace.exe", "/NH"], capture_output=True, text=True)
+    return "UniSpace.exe" in out.stdout
 
 
 def make_zip() -> Path:
-    """UniKanban.zip com a pasta UniKanban/ (UniKanban.exe + _internal + LEIA-ME.txt), pronto para envio."""
+    """UniSpace.zip com a pasta UniSpace/ (UniSpace.exe + _internal + LEIA-ME.txt), pronto para envio."""
     if not (EXE.exists() and INTERNAL.exists()):
         raise SystemExit("Executável não encontrado. Rode primeiro: build_exe.py")
     tmp = ZIP.with_suffix(".zip.tmp")
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        z.write(EXE, "UniKanban/UniKanban.exe")
+        z.write(EXE, "UniSpace/UniSpace.exe")
         for f in sorted(INTERNAL.rglob("*")):
             if f.is_file():
-                z.write(f, "UniKanban/_internal/" + f.relative_to(INTERNAL).as_posix())
-        z.writestr("UniKanban/LEIA-ME.txt", LEIA_ME.replace("\n", "\r\n"))
+                z.write(f, "UniSpace/_internal/" + f.relative_to(INTERNAL).as_posix())
+        z.writestr("UniSpace/LEIA-ME.txt", LEIA_ME.replace("\n", "\r\n"))
     with zipfile.ZipFile(tmp) as z:                      # confere a integridade antes de substituir
         bad = z.testzip()
         if bad:
@@ -80,13 +84,13 @@ def main() -> int:
         make_zip()
         return 0
     if app_running():
-        print("Feche o UniKanban antes de gerar o executável (o arquivo atual está em uso).")
+        print("Feche o UniSpace antes de gerar o executável (o arquivo atual está em uso).")
         return 1
     print("Gerando o executável…")
-    r = subprocess.run([sys.executable, "-m", "PyInstaller", str(ROOT / "UniKanban.spec"), "--noconfirm",
+    r = subprocess.run([sys.executable, "-m", "PyInstaller", str(ROOT / "UniSpace.spec"), "--noconfirm",
                         "--distpath", str(STAGE), "--workpath", str(WORK / "_work")], cwd=ROOT)
-    built = STAGE / "UniKanban"
-    if r.returncode != 0 or not (built / "UniKanban.exe").exists():
+    built = STAGE / "UniSpace"
+    if r.returncode != 0 or not (built / "UniSpace.exe").exists():
         print("Falha ao gerar o executável.")
         return 1
 
@@ -95,14 +99,16 @@ def main() -> int:
         EXE.unlink()
     if INTERNAL.exists():
         shutil.rmtree(INTERNAL)
-    shutil.move(str(built / "UniKanban.exe"), EXE)
+    shutil.move(str(built / "UniSpace.exe"), EXE)
     shutil.move(str(built / "_internal"), INTERNAL)
     shutil.rmtree(WORK, ignore_errors=True)
+    for legacy in (ROOT / "UniKanban.exe", ROOT / "UniKanban.zip"):   # executável com o nome antigo
+        legacy.unlink(missing_ok=True)
     old_dist = ROOT / "dist"                      # local antigo do executável
     if old_dist.exists():
         shutil.rmtree(old_dist, ignore_errors=True)
 
-    print("Conferindo o executável (Chrome + portal)…")
+    print("Conferindo o executável (navegador + portal)…")
     d = subprocess.run([str(EXE), "--diagnostico"])
     if d.returncode != 0:
         print(f"O executável foi gerado, mas o autodiagnóstico falhou (código {d.returncode}).")

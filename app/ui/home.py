@@ -55,7 +55,7 @@ class Onboarding(QFrame):
         v.setSpacing(10)
         v.addWidget(icon_label("lock", COLORS["primary"], 26), 0, Qt.AlignLeft)
         v.addWidget(label("Conecte sua conta do portal", "H2"))
-        v.addWidget(label("Use o mesmo usuário e senha do portal do aluno Unilavras. O UniKanban entra na "
+        v.addWidget(label("Use o mesmo usuário e senha do portal do aluno Unilavras. O UniSpace entra na "
                           "Sala de Aula Virtual, lê suas disciplinas e monta o quadro para você.", "Muted", wrap=True))
         v.addSpacing(6)
         v.addWidget(label("Usuário", "FieldLabel"))
@@ -171,7 +171,8 @@ class HomePage(QWidget):
         head.addLayout(tv, 1)
         rv = QVBoxLayout()
         rv.setSpacing(4)
-        self.update_btn = button("Atualizar agora", "Primary", "sync", tip="Buscar novidades no portal (F5)",
+        self.update_btn = button("Atualizar agora", "Primary", "sync",
+                                 tip="Atualizar tudo: atividades, notas e eventos (F5)",
                                  on_click=self.request_update.emit)
         self.update_btn.setMinimumHeight(38)
         self.last = label("", "Small")
@@ -197,7 +198,7 @@ class HomePage(QWidget):
         grid = QGridLayout()
         grid.setSpacing(12)
         self.t_soon = Tile("clock", COLORS["warn"], "Vencem em até 48 h", "Ver só as atividades urgentes")
-        self.t_todo = Tile("circle", "#64748B", "A fazer", "Abrir o quadro")
+        self.t_todo = Tile("circle", COLORS["status_todo"], "A fazer", "Abrir o quadro")
         self.t_doing = Tile("sync", COLORS["primary"], "Em andamento", "Abrir o quadro")
         self.t_done = Tile("check_circle", COLORS["ok"], "Concluídas", "Abrir o quadro")
         self.t_soon.clicked.connect(lambda: self.go_board.emit("urgentes"))
@@ -231,7 +232,7 @@ class HomePage(QWidget):
     def refresh(self, *_):
         now = datetime.now(TZ)
         has_creds = bool(self.ctx.creds.username())
-        acts = self.ctx.db.list_activities()
+        acts = [a for a in self.ctx.db.list_activities() if not a.is_exam]         # provas ficam na agenda
         first_use = not has_creds and not acts
         self.onb_wrap.setVisible(first_use)
         self.main.setVisible(not first_use)
@@ -242,7 +243,7 @@ class HomePage(QWidget):
         pending = [a for a in acts if a.status != STATUS_DONE]
         urgent = [a for a in pending if urgency(a, now) in (URG_SOON, URG_OVERDUE)]
         week = [a for a in pending if a.due_at and 0 <= (a.due_at - now).total_seconds() <= 7 * 86400]
-        self.hello.setText(f"{greeting(now)}! 👋" if not first_use else "Boas-vindas ao UniKanban 👋")
+        self.hello.setText(f"{greeting(now)}! 👋" if not first_use else "Boas-vindas ao UniSpace 👋")
         if first_use:
             self.summary.setText("Suas atividades da Sala de Aula Virtual em um quadro simples e organizado.")
         elif not acts:

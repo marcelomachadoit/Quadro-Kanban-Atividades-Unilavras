@@ -10,7 +10,8 @@ from keyring.errors import KeyringError, PasswordDeleteError
 
 log = logging.getLogger(__name__)
 
-SERVICE = "UniKanban/novoportal.unilavras.edu.br"
+SERVICE = "UniSpace/novoportal.unilavras.edu.br"
+LEGACY_SERVICE = "UniKanban/novoportal.unilavras.edu.br"   # nome antigo do aplicativo
 _USER_SLOT = "__usuario__"   # guarda qual usuário está configurado
 
 
@@ -60,6 +61,23 @@ class CredentialStore:
         except KeyringError as e:
             raise CredentialError(f"Falha ao ler o Gerenciador de Credenciais: {e}") from e
         return Credentials(u, p) if p else None
+
+    def migrate_from(self, legacy_service: str = LEGACY_SERVICE) -> bool:
+        """Copia a conta salva pelo UniKanban (nome antigo) para o cofre do UniSpace e apaga a cópia antiga."""
+        try:
+            if self.username():
+                return False
+            old = CredentialStore(legacy_service)
+            creds = old.load()
+            if not creds:
+                return False
+            self.save(creds.username, creds.password)
+            old.clear()
+        except (KeyringError, CredentialError):
+            log.warning("Não foi possível migrar a conta salva pelo UniKanban.")
+            return False
+        log.info("Conta do portal migrada do UniKanban para o UniSpace.")
+        return True
 
     def clear(self) -> None:
         u = self.username()

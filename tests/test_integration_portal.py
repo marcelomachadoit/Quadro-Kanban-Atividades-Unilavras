@@ -1,6 +1,6 @@
 """Teste de integração com o portal real.
 
-Executado somente quando as variáveis de ambiente UNIKANBAN_TEST_USER e UNIKANBAN_TEST_PASSWORD
+Executado somente quando as variáveis de ambiente UNISPACE_TEST_USER e UNISPACE_TEST_PASSWORD
 estiverem definidas (as credenciais nunca ficam gravadas em arquivos).
 """
 import os
@@ -11,8 +11,8 @@ from app.database.db import Database
 from app.services.credentials import Credentials
 from app.services.updater import Updater
 
-USER = os.environ.get("UNIKANBAN_TEST_USER")
-PWD = os.environ.get("UNIKANBAN_TEST_PASSWORD")
+USER = os.environ.get("UNISPACE_TEST_USER")
+PWD = os.environ.get("UNISPACE_TEST_PASSWORD")
 
 pytestmark = pytest.mark.skipif(not (USER and PWD), reason="credenciais de teste não definidas no ambiente")
 
@@ -44,7 +44,7 @@ def test_connection_ok(tmp_path):
     db.close()
 
 
-@pytest.mark.skipif(not os.environ.get("UNIKANBAN_TEST_WRONG_PASSWORD"),
+@pytest.mark.skipif(not os.environ.get("UNISPACE_TEST_WRONG_PASSWORD"),
                     reason="desligado por padrão: tentativas com senha errada levam o portal a exigir "
                            "verificação humana (Cloudflare) na conta real")
 def test_wrong_password_is_reported(tmp_path):

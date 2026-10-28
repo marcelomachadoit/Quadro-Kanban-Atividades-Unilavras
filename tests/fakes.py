@@ -2,10 +2,21 @@
 from app.automation.portal import Cancelled, LoginFailed, SessionExpired, StructureChanged
 
 
-def topic(tid, title, ttype=8, cat=5, deadline=None, grade=None, children=None, blocked=False):
+def topic(tid, title, ttype=8, cat=5, deadline=None, grade=None, children=None, blocked=False, modified=None):
     return {"id": tid, "title": title, "topicTypeId": ttype, "categoryTypeId": cat,
             "hasDeadline": deadline is not None, "deadlineAt": deadline, "hasGrade": grade is not None,
-            "grade": {"value": grade}, "isBlockedContentByConditional": blocked, "children": children or []}
+            "grade": {"value": grade}, "isBlockedContentByConditional": blocked, "children": children or [],
+            "modifiedAt": modified}
+
+
+PLANOGRAMA_PDF_URL = "https://static.plataforma.grupoa.education/unilavras_prod/unilavrasedu/plano-bd.pdf"
+
+
+def planograma_topic_json(url=PLANOGRAMA_PDF_URL):
+    """Resposta de .../topics/{id} do Planograma, no formato real (HTML com o <grupoabook> do PDF)."""
+    return {"context": {"topicTitle": "Planograma"}, "topics": {"id": "9", "title": "Planograma", "content": {
+        "html": "<p>O Planograma &#xE9; um documento de organiza&#xE7;&#xE3;o das aulas.</p>"
+                f"<grupoabook file=\"{url}\" filename=\"bd_planograma.pdf\" type=\"embedded\"></grupoabook>"}}}
 
 
 def contents(cid, name, topics, start="2026-10-05"):
@@ -23,6 +34,8 @@ COURSES = {"courses": [
 
 CONTENTS = {
     "1": contents(1, "Banco de Dados", [
+        topic(8, "Informações sobre a disciplina", 2, 1, children=[
+            topic(9, "Planograma", 3, 2, modified="2026-10-18 13:16:45.651091+00")]),
         topic(10, "Ciclo I", 1, 1, children=[
             topic(11, "Slides da aula", 3, 2),
             topic(12, "Questionário do Módulo 3", 15, 8, grade=10),                    # sem prazo, com pontos
@@ -44,6 +57,7 @@ class FakeClient:
         self.lxp_base = "https://unilavrasedu.grupoa.education"
         self.logins = 0
         self.calls = []
+        self.planograma_calls = []
 
     def __enter__(self):
         return self
@@ -91,6 +105,18 @@ class FakeClient:
                     "gradeCategories": []}
         return {"name": "Banco de Dados", "gradeCategories": [{"name": "Atividades", "gradeBooks": [
             {"name": "Trabalho prático", "value": None, "isCompleted": True, "submittedAt": "2026-10-25 18:00:00"}]}]}
+
+    def course_topic(self, course, topic_id):
+        self.planograma_calls.append(f"topic:{topic_id}")
+        return planograma_topic_json()
+
+    def download(self, url):
+        """O PDF do Planograma vem do comportamento ``pdf`` (bytes); sem ele, simula falha no download."""
+        self.planograma_calls.append("download")
+        if "pdf" not in self.b:
+            from app.automation.portal import AutomationError
+            raise AutomationError("O arquivo respondeu com erro 404.")
+        return self.b["pdf"]
 
     def save_diagnostic(self, *a):
         return None

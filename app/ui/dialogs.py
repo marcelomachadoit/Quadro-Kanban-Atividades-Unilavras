@@ -86,7 +86,8 @@ class TrashDialog(QDialog):
 class ReportDialog(QDialog):
     """Resumo detalhado da última atualização (aberto a partir da notificação)."""
 
-    def __init__(self, report, parent=None):
+    def __init__(self, report, parent=None, extra: list[str] | None = None):
+        """``extra``: linhas adicionais (notas e eventos, na atualização completa)."""
         super().__init__(parent)
         self.setWindowTitle("Resumo da atualização")
         self.setMinimumWidth(560)
@@ -115,11 +116,11 @@ class ReportDialog(QDialog):
             stats.addSpacing(18)
         stats.addStretch(1)
         lay.addLayout(stats)
-        details = self.details(report)
+        details = self.details(report) + list(extra or [])
         if details:
             txt = label("<br>".join(details), wrap=True)
             txt.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            txt.setStyleSheet(f"background:white;border:1px solid {COLORS['border']};border-radius:10px;padding:12px;")
+            txt.setStyleSheet(f"background:{COLORS['surface']};border:1px solid {COLORS['border']};border-radius:10px;padding:12px;")
             lay.addWidget(txt)
         row = QHBoxLayout()
         row.addStretch(1)

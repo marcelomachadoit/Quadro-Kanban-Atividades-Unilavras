@@ -19,9 +19,9 @@ def label(text: str = "", obj: str = "", wrap: bool = False) -> QLabel:
     return lb
 
 
-def icon_label(name: str, color: str = COLORS["muted"], px: int = 14) -> QLabel:
+def icon_label(name: str, color: Optional[str] = None, px: int = 14) -> QLabel:
     lb = QLabel(glyph(name))
-    lb.setStyleSheet(glyph_css(px, color))
+    lb.setStyleSheet(glyph_css(px, color or COLORS["muted"]))
     lb.setFixedWidth(px + 4)
     lb.setAlignment(Qt.AlignCenter)
     return lb
@@ -43,11 +43,11 @@ def button(text: str, obj: str = "", icon_name: str = "", icon_color: Optional[s
     return b
 
 
-def icon_button(name: str, tip: str, on_click: Optional[Callable] = None, color: str = COLORS["muted"],
+def icon_button(name: str, tip: str, on_click: Optional[Callable] = None, color: Optional[str] = None,
                 size: int = 16) -> QPushButton:
     b = QPushButton()
     b.setObjectName("Icon")
-    b.setIcon(icon(name, color, size))
+    b.setIcon(icon(name, color or COLORS["muted"], size))
     b.setToolTip(tip)
     b.setAccessibleName(tip)
     b.setCursor(Qt.PointingHandCursor)
@@ -110,12 +110,8 @@ class EmptyState(QWidget):
 class Banner(QFrame):
     """Aviso persistente no topo do conteúdo, com até duas ações."""
 
-    KINDS = {
-        "error": (COLORS["danger_bg"], COLORS["danger_text"], "#FECACA", "error"),
-        "warn": (COLORS["warn_bg"], COLORS["warn_text"], "#FDE68A", "warning"),
-        "info": (COLORS["info_bg"], COLORS["info_text"], "#BFDBFE", "info"),
-        "ok": (COLORS["ok_bg"], COLORS["ok_text"], "#A7F3D0", "check_circle"),
-    }
+    KINDS = {"error": ("danger", "error"), "warn": ("warn", "warning"), "info": ("info", "info"),
+             "ok": ("ok", "check_circle")}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -142,7 +138,8 @@ class Banner(QFrame):
 
     def show_message(self, kind: str, title: str, text: str = "",
                      actions: tuple[tuple[str, Callable], ...] = ()) -> None:
-        bg, fg, border, ic = self.KINDS[kind]
+        tone, ic = self.KINDS[kind]
+        bg, fg, border = COLORS[f"{tone}_bg"], COLORS[f"{tone}_text"], COLORS[f"{tone}_border"]
         self.setStyleSheet(f"QFrame#Banner {{ background:{bg}; border:1px solid {border}; }}"
                            f"QFrame#Banner QLabel {{ color:{fg}; background: transparent; }}")
         self.ic.setText(glyph(ic))
@@ -193,8 +190,8 @@ class Toast(QFrame):
     def show_message(self, text: str, action_text: str = "", action: Optional[Callable] = None,
                      icon_name: str = "check_circle", ms: int = 5000) -> None:
         self.ic.setText(glyph(icon_name))
-        self.ic.setStyleSheet(glyph_css(14, "#86EFAC" if icon_name == "check_circle" else
-                                        ("#FCA5A5" if icon_name in ("error", "warning") else "#93C5FD")))
+        tone = "ok" if icon_name == "check_circle" else ("danger" if icon_name in ("error", "warning") else "primary")
+        self.ic.setStyleSheet(glyph_css(14, COLORS[tone]))
         self.msg.setText(text)
         self._fn = action
         self.action.setText(action_text)
@@ -313,7 +310,7 @@ class NotificationCard(QFrame):
     def __init__(self, parent: QWidget):
         super().__init__(parent)
         self.setObjectName("NotificationCard")
-        self.setStyleSheet(f"QFrame#NotificationCard {{ background:white; border:1px solid {COLORS['border']};"
+        self.setStyleSheet(f"QFrame#NotificationCard {{ background:{COLORS['surface']}; border:1px solid {COLORS['border']};"
                            f" border-left:4px solid {COLORS['primary']}; border-radius:12px; }}"
                            "QFrame#NotificationCard QLabel { background: transparent; border: none; }")
         self.setFixedWidth(380)

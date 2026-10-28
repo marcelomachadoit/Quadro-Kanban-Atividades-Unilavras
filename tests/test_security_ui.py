@@ -1,4 +1,4 @@
-"""Segurança (logs sem segredos, cofre de credenciais) e interface (Kanban, edição, persistência)."""
+"""Segurança (logs sem segredos, cofre de credenciais) e interface (quadro, edição, persistência)."""
 import logging
 import os
 

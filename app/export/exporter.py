@@ -12,7 +12,7 @@ import pandas as pd
 from app.config import TZ
 from app.models.activity import SEEN_LABELS, STATUS_LABELS, Activity, iso_to_dt
 
-EXPORT_COLUMNS = ["Nome da atividade", "Disciplina", "Prazo de entrega", "Pontuação", "Status no Kanban",
+EXPORT_COLUMNS = ["Nome da atividade", "Disciplina", "Prazo de entrega", "Pontuação", "Status no quadro",
                   "URL de origem", "Última verificação", "Situação na última consulta", "Observações",
                   "Origem", "Divergências"]
 
@@ -30,7 +30,7 @@ def to_dataframe(activities: Iterable[Activity]) -> pd.DataFrame:
             "Disciplina": a.course,
             "Prazo de entrega": a.due_display,
             "Pontuação": a.points,
-            "Status no Kanban": STATUS_LABELS.get(a.status, a.status),
+            "Status no quadro": STATUS_LABELS.get(a.status, a.status),
             "URL de origem": a.url or "-",
             "Última verificação": _fmt(a.last_checked),
             "Situação na última consulta": SEEN_LABELS.get(a.last_seen_status, a.last_seen_status),
@@ -81,7 +81,7 @@ def validate_backup(path: Path | str) -> int:
                 raise ValueError("arquivo corrompido")
             cols = {r[1] for r in c.execute("PRAGMA table_info(activities)")}
             if not {"source_key", "status", "portal_name", "user_name"} <= cols:
-                raise ValueError("não é um backup do UniKanban")
+                raise ValueError("não é um backup do UniSpace")
             return c.execute("SELECT COUNT(*) FROM activities").fetchone()[0]
         finally:
             c.close()

@@ -55,7 +55,7 @@ def setup_logging(level: int = logging.INFO) -> None:
         return
     root.setLevel(level)
     fmt = _RedactingFormatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
-    fh = RotatingFileHandler(LOG_DIR / "unikanban.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8")
+    fh = RotatingFileHandler(LOG_DIR / "unispace.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8")
     fh.setFormatter(fmt)
     fh.addFilter(RedactingFilter())
     root.addHandler(fh)

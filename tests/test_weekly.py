@@ -1,4 +1,4 @@
-"""Atualização semanal automática e "+N mais" do calendário."""
+"""Atualização completa/semanal automática e "+N mais" do calendário."""
 import os
 from datetime import date, datetime, timedelta
 
@@ -6,7 +6,7 @@ import pytest
 
 from app.config import TZ
 from app.services.credentials import Credentials
-from app.services.weekly import (META_WEEKLY_ATTEMPT, META_WEEKLY_RUN, WeeklyUpdater, is_weekly_due, week_start)
+from app.services.weekly import (META_WEEKLY_ATTEMPT, META_WEEKLY_RUN, FullUpdater, is_weekly_due, week_start)
 
 MON, TUE, WED, SUN = date(2026, 10, 26), date(2026, 10, 27), date(2026, 10, 28), date(2026, 11, 1)
 
@@ -41,18 +41,21 @@ def test_weekly_runs_everything_with_a_single_login(db):
         c = GradesFake(behaviour={}, **kw)
         made.append(c)
         return c
-    r = WeeklyUpdater(db, Credentials("u", "p"), client_factory=factory, today=WED).run()
+    from tests.test_events import LIST_HTML, fake_fetch
+    r = FullUpdater(db, Credentials("u", "p"), client_factory=factory, today=WED,
+                    events_fetch=fake_fetch({"https://eventos.unilavras.edu.br/": LIST_HTML})).run()
     assert r.ok
     assert len(made) == 1 and made[0].logins == 1                 # um navegador, um login
     assert r.activities.found > 0 and len(r.grades.courses_ok) == 5
     assert db.list_activities() and db.list_grade_snapshots() and db.list_course_info()
+    assert r.events.found == 2 and len(db.list_portal_events()) == 2      # eventos entram na mesma atualização
     assert db.get_meta(META_WEEKLY_RUN) == WED.isoformat() == db.get_meta(META_WEEKLY_ATTEMPT)
 
 
 def test_weekly_failure_records_attempt_but_not_run(db):
     from tests.test_grades import GradesFake
-    r = WeeklyUpdater(db, Credentials("u", "p"), today=WED,
-                      client_factory=lambda **kw: GradesFake(behaviour={"login_fail": True}, **kw)).run()
+    r = FullUpdater(db, Credentials("u", "p"), today=WED,
+                    client_factory=lambda **kw: GradesFake(behaviour={"login_fail": True}, **kw)).run()
     assert not r.ok and r.errors
     assert db.get_meta(META_WEEKLY_ATTEMPT) == WED.isoformat() and db.get_meta(META_WEEKLY_RUN) is None
 
@@ -82,18 +85,18 @@ class _Creds:
 
 def test_main_window_starts_weekly_and_shows_card(qapp, db, monkeypatch):
     from app.services.sync import SyncReport
-    from app.services.weekly import WeeklyReport
+    from app.services.weekly import FullReport
     from app.ui import main_window as MW
     from app.ui.context import AppContext
-    monkeypatch.delenv("UNIKANBAN_NO_AUTO_UPDATE", raising=False)
-    monkeypatch.setattr(MW.WeeklyWorker, "start", lambda self: None)      # não abre navegador no teste
+    monkeypatch.delenv("UNISPACE_NO_AUTO_UPDATE", raising=False)
+    monkeypatch.setattr(MW.FullWorker, "start", lambda self: None)      # não abre navegador no teste
     w = MW.MainWindow(AppContext(db, _Creds()))
     w.show()
     assert w.maybe_weekly_update() is True
     assert not w.notif.isHidden()
     assert w.notif.title.text() == "Atualização de dados semanal em andamento"
     assert not w.loading.isHidden()
-    rep = WeeklyReport(activities=SyncReport(added=2))
+    rep = FullReport(activities=SyncReport(added=2))
     w._weekly_finished(rep)
     assert w.notif.isHidden() and w.loading.isHidden()
     assert "Atualização semanal concluída" in w.toast.msg.text()
@@ -107,7 +110,7 @@ def test_weekly_not_started_when_already_done_this_week(qapp, db, monkeypatch):
     from app.ui.context import AppContext
     today = datetime.now(TZ).date()
     db.set_meta(META_WEEKLY_RUN, today.isoformat())
-    monkeypatch.setattr(MW.WeeklyWorker, "start", lambda self: None)
+    monkeypatch.setattr(MW.FullWorker, "start", lambda self: None)
     w = MW.MainWindow(AppContext(db, _Creds()))
     assert w.maybe_weekly_update() is False and w.notif.isHidden()
 
@@ -139,6 +142,6 @@ def test_calendar_more_items_open_day_dialog(qapp, db):
 def test_auto_update_can_be_disabled_for_tests(qapp, db, monkeypatch):
     from app.ui import main_window as MW
     from app.ui.context import AppContext
-    monkeypatch.setenv("UNIKANBAN_NO_AUTO_UPDATE", "1")
-    monkeypatch.setattr(MW.WeeklyWorker, "start", lambda self: (_ for _ in ()).throw(AssertionError("não deveria")))
+    monkeypatch.setenv("UNISPACE_NO_AUTO_UPDATE", "1")
+    monkeypatch.setattr(MW.FullWorker, "start", lambda self: (_ for _ in ()).throw(AssertionError("não deveria")))
     assert MW.MainWindow(AppContext(db, _Creds())).maybe_weekly_update() is False

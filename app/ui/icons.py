@@ -15,6 +15,8 @@ GLYPHS = {
     "folder": "", "lock": "", "user": "", "chevron_down": "", "chevron_right": "", "chevron_left": "",
     "circle": "", "check_circle": "", "help": "", "globe": "", "error": "",
     "trash": "", "star": "", "education": "",
+    "moon": "", "sun": "", "event": "", "agenda": "", "pin": "",
+    "mail": "",
 }
 
 

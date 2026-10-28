@@ -12,11 +12,14 @@ from app.services.credentials import CredentialStore
 class AppContext(QObject):
     data_changed = Signal()          # atividades alteradas -> telas recarregam
     update_finished = Signal(object)  # SyncReport
+    events_changed = Signal()         # eventos da Unilavras relidos
+    agenda_changed = Signal()         # compromissos da agenda alterados
 
     def __init__(self, db: Database, creds: CredentialStore | None = None):
         super().__init__()
         self.db = db
         self.creds = creds or CredentialStore()
+        self.window = None               # janela principal (o conteúdo é remontado ao trocar o modo noturno)
         self.data_changed.connect(self.register_colors)
         self.register_colors()
 
@@ -39,6 +42,14 @@ class AppContext(QObject):
     @show_browser.setter
     def show_browser(self, v: bool) -> None:
         self.db.set_meta("show_browser", "1" if v else "0")
+
+    @property
+    def dark_mode(self) -> bool:
+        return self.db.get_meta("dark_mode", "0") == "1"
+
+    @dark_mode.setter
+    def dark_mode(self, v: bool) -> None:
+        self.db.set_meta("dark_mode", "1" if v else "0")
 
     def labels(self) -> PortalLabels:
         d = PortalLabels()
