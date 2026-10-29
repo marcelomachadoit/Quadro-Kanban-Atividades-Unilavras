@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=UniSpace
+GenericName=Organizador acadêmico
+Comment=Atividades, notas, encontros e eventos da Unilavras em um só lugar
+Exec=@EXEC@
+Icon=@ICON@
+Terminal=false
+Categories=Education;Office;
+StartupWMClass=UniSpace
+StartupNotify=true
